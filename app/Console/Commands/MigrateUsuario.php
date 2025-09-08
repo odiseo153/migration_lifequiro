@@ -1,0 +1,60 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Models\User;
+use App\Models\Position;
+use App\Models\Legacy\Usuario;
+
+class MigrateUsuario extends BaseCommand
+{
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'migrate:usuarios';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Migrar datos desde usuarios (legacy) hacia usuarios (nuevo)';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
+    {
+        $this->info("Iniciando migración de usuarios...");
+
+        Usuario::chunk(500, function ($usuarios) {
+            foreach ($usuarios as $u) {
+                User::updateOrCreate([
+                    'id' => $u->id,
+                ], [
+                    'first_name'  => mb_convert_encoding($u->nombre, 'UTF-8', 'auto'),
+                    'last_name'  => mb_convert_encoding($u->apellido, 'UTF-8', 'auto'),
+                    'email' => $this->randomEmail($u->nombre),
+                    'username' => $this->randomUsername($u->nombre),
+                    'password' => $u->pass,
+                    'position_id' => $u->puesto == 0 ? 1 : $u->puesto,
+                ]);
+            }
+        });
+
+        $this->info("Migración completada.");
+    }
+
+    public function randomEmail($nombre)
+    {
+        return $nombre.rand(1000, 9999).'@example.com';
+    }
+
+    public function randomUsername($nombre)
+    {
+        return $nombre.rand(1000, 9999);
+    }
+}
+
