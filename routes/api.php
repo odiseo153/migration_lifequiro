@@ -26,5 +26,5 @@ return 'Migración completada';
 Route::get('/test', function (Request $request) {
 
 
-    return Paciente::limit(10)->select('id','estado_civil','sexo')->get();
+    return Planes::limit(10)->select('id','estado_civil','sexo')->get();
     });

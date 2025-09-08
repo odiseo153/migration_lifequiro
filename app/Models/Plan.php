@@ -6,6 +6,7 @@ namespace App\Models;
 class Plan extends BaseModel
 {
     protected $fillable = [
+        'id',
         'name',
         'code',
         'price',
