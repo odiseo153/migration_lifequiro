@@ -58,6 +58,34 @@ foreach($typesOfPlans as $type){
 }
 $this->command->info('- Tipos de planes creados con éxito.');
 
+$paymentMethods = [
+    ['name' => 'Efectivo', 'id' => 1],
+    ['name' => 'Tarjeta Credito / Debito', 'id' => 2],
+    ['name' => 'Cheque', 'id' => 3],
+    ['name' => 'Transferencia o Deposito', 'id' => 4],
+    ['name' => 'Nota de Credito', 'id' => 5],
+    ['name' => 'Credito', 'id' => 6],
+  //  ['name' => 'Saldo a favor', 'id' => 6],
+];
+
+foreach($paymentMethods as $method){
+    PaymentMethod::updateOrCreate(['id'=>$method['id']],['name'=>$method['name'],'id'=>$method['id']]);
+}
+$this->command->info('- Métodos de pago creados con éxito.');
+
+$transationTypes = [
+    ['name' => 'Items','id'=>1],
+    ['name' => 'Combos Ofertas','id'=>2],
+    ['name' => 'Pago Plan','id'=>3],
+    ['name' => 'Nota de Credito','id'=> 4],
+    ['name' => 'Pago Deuda','id'=>5],
+];
+
+foreach($transationTypes as $type){
+    TransactionType::updateOrCreate(['id'=>$type['id']],['name'=>$type['name'],'id'=>$type['id']]);
+}
+$this->command->info('- Tipos de transacciones creados con éxito.');
+
 /*
 $this->command->info('- Seeders de roles, permisos y usuarios ejecutados.');
 
@@ -107,29 +135,6 @@ $statuses = [
         TypeOfItem::insert($types);
         $this->command->info('- Tipos de servicios creados con éxito.');
 
-        $paymentMethods = [
-            ['name' => 'Efectivo', 'id' => 1],
-            ['name' => 'Tarjeta Crédito / Debito', 'id' => 2],
-            ['name' => 'Cheque', 'id' => 3],
-            ['name' => 'Transferencia o Deposito', 'id' => 4],
-            ['name' => 'Nota de Credito', 'id' => 5],
-            ['name' => 'Credito', 'id' => 6],
-          //  ['name' => 'Saldo a favor', 'id' => 6],
-        ];
-
-        PaymentMethod::insert($paymentMethods);
-        $this->command->info('- Métodos de pago creados con éxito.');
-
-        $transationTypes = [
-            ['name' => 'Items','id'=>1],
-            ['name' => 'Combos Ofertas','id'=>2],
-            ['name' => 'Pago Plan','id'=>3],
-            ['name' => 'Nota de Credito','id'=> 4],
-            ['name' => 'Pago Deuda','id'=>5],
-        ];
-
-        TransactionType::insert($transationTypes);
-        $this->command->info('- Tipos de transacciones creados con éxito.');
 
         $arsList = [
             'ARS APS',
