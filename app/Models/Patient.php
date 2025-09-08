@@ -7,9 +7,10 @@ use App\Enums\ServicesStatus;
 use App\Enums\AppointmentType;
 use App\Models\PlanTransaction;
 
-class Patient extends AuthenticablePatient 
+class Patient extends AuthenticablePatient
 {
     protected $fillable = [
+        'id',
         'first_name',
         'last_name',
         'token',
@@ -31,7 +32,7 @@ class Patient extends AuthenticablePatient
         'where_met_us_id',
         'patient_group_id'
     ];
-    
+
     protected $appends = ['is_birthday','age','patient_code','type_patient','where_he_met_us_name','last_appointment'];
    // protected $with = ['assigned_plan'];
 
@@ -89,7 +90,7 @@ class Patient extends AuthenticablePatient
                     ->whereNull('patient_items.deleted_at')
                     ->withTimestamps();
     }
-    
+
     public function acquired_services()
     {
         return $this->hasMany(AcquiredService::class);
@@ -291,7 +292,7 @@ class Patient extends AuthenticablePatient
         $birthDate = Carbon::parse($this->birth_date);
         $today = Carbon::today();
 
-        return $birthDate->month === $today->month && 
+        return $birthDate->month === $today->month &&
                $birthDate->day === $today->day;
     }
 
@@ -300,23 +301,23 @@ class Patient extends AuthenticablePatient
         if (!$this->birth_date) {
             return 0;
         }
-    
+
         $birthDate = Carbon::parse($this->birth_date);
         $today = Carbon::today();
-        
+
         $years = $birthDate->diffInYears($today);
-    
+
         return (int)$years;
     }
 
     public function getLastAppointmentAttribute()
     {
         $last_appointment = $this->appointments()->orderBy('created_at', 'desc')->first();
-    
+
         if(!$last_appointment){
             return [];
         }
-        
+
         return [
             'id' => $last_appointment->id,
             'date' => $last_appointment->date,
@@ -344,11 +345,11 @@ class Patient extends AuthenticablePatient
 
     public function getTypePatient()
     {
-        
+
         if ($this->assigned_plan) {
             return ($this->assigned_plan->plan->type_of_plan->name == 'VIP' ? 'MR VIP' : 'MR');
         }
-        
+
         if ($this->getHasAFullCycle()) {
             return 'MIP';
         }
@@ -368,7 +369,7 @@ class Patient extends AuthenticablePatient
                     }
                 });
             }
-    
+
             // Caso MIP (full cycle)
             if ($type === 'MIP') {
                 $q->whereExists(function ($sub) {
@@ -405,7 +406,7 @@ class Patient extends AuthenticablePatient
 
         // Crear un array con el historial de servicios consumidos (solo items de plan)
         $serviceHistory = [];
-        
+
         foreach ($acquiredServiceItems as $service) {
             if (optional($service->patient_plan_item)->type_of_item_id) {
                 $serviceHistory[] = [
@@ -430,7 +431,7 @@ class Patient extends AuthenticablePatient
         } else {
             // Determinar la posición en el ciclo (2 ajustes + 1 terapia = ciclo de 3)
             $positionInCycle = $totalServices % 3;
-            
+
             switch ($positionInCycle) {
                 case 0: // Posición 0: primer ajuste del ciclo
                 case 1: // Posición 1: segundo ajuste del ciclo
@@ -455,7 +456,7 @@ class Patient extends AuthenticablePatient
     {
         $positionInCycle = $totalServices % 3;
         $cycleNumber = intval($totalServices / 3) + 1;
-        
+
         switch ($positionInCycle) {
             case 0:
                 return "Ciclo {$cycleNumber} - Primer Ajuste";
