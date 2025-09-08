@@ -86,6 +86,16 @@ foreach($transationTypes as $type){
 }
 $this->command->info('- Tipos de transacciones creados con éxito.');
 
+
+$typesOfTaxReceipts = [
+    ['name' => 'Comprobante Fiscal','id'=>1],
+];
+
+foreach($typesOfTaxReceipts as $type){
+    TypeOfTaxReceipt::updateOrCreate(['id'=>$type['id']],['name'=>$type['name'],'id'=>$type['id']]);
+}
+$this->command->info('- Tipos de comprobantes fiscales creados con éxito.');
+
 /*
 $this->command->info('- Seeders de roles, permisos y usuarios ejecutados.');
 
