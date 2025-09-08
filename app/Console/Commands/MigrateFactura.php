@@ -61,7 +61,7 @@ class MigrateFactura extends BaseCommand
                 PlanTransaction::create([
                     'assigned_plan_id' => $f->ajuste_plan_id,
                     'patient_id' => $f->paciente_id,
-                    'amount' => $f->monto,
+                    'amount' => $f->monto =='' || $f->monto ==null ? 0 : $f->monto,
                     'transaction_type' => 'factura de abono a plan, de migracion',
                     'description' => 'Factura',
                 ]);
