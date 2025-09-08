@@ -34,9 +34,7 @@ class MigrateCentros extends BaseCommand
                 Branch::create([
                     'id'  => $p->id,
                     'name'  => mb_convert_encoding($p->nombre, 'UTF-8', 'auto'),
-                    'company_id'   => Company::factory([
-                        'name' => 'Lifequiro',
-                    ])->create()->id,
+                    'company_id'   => 8,
                     'phone'  => $p->telefono,
                     'code' => $p->codigo,
                     'address' => mb_convert_encoding($p->direccion, 'UTF-8', 'auto'),
