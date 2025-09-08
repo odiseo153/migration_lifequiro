@@ -85,10 +85,9 @@ class MigratePlanesAsignados extends BaseCommand
                             ]);
                         }
                     }
-            */
 
-                $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
-                $priceTerapia = $p->terapia_fisica > 0 ? $p->consumido / $p->terapia_fisica : 0;
+                    $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
+                    $priceTerapia = $p->terapia_fisica > 0 ? $p->consumido / $p->terapia_fisica : 0;
 
                 if ($p->sessiones_utilizadas != 0) {
                     for ($i = 0; $i < $p->sessiones_utilizadas; $i++) {
@@ -114,6 +113,7 @@ class MigratePlanesAsignados extends BaseCommand
                         ]);
                     }
                 }
+                */
 
 
             }
