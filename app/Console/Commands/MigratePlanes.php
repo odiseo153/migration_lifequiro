@@ -19,9 +19,8 @@ class MigratePlanes extends BaseCommand
                     'id'  => $p->id,
                 ], [
                     'id'  => $p->id,
-                    'name'  => mb_convert_encoding($p->plan, 'UTF-8', 'auto'),
-
-                    'code'   => $p->codigo ?? $this->generateRandomCode(Plan::class,8,'code'),
+                    'name'  => $p->plan,
+                    'code'   => $p->codigo ?? 'GENERATED-'.$this->generateRandomCode(Plan::class,8,'code'),
                     'price'  => $p->precio ?? 0,
                     'total_sessions' => $p->total_sessiones_plan ?? 0,
                     'type_of_plan_id'       => $p->tipo ,

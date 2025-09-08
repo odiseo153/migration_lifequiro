@@ -13,7 +13,7 @@ class MigratePatients extends BaseCommand
     {
         $this->info("Iniciando migración de pacientes...");
 
-        Paciente::chunk(100, function ($pacientes) {
+        Paciente::chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
                 try {
                     Patient::updateOrCreate(
@@ -22,19 +22,19 @@ class MigratePatients extends BaseCommand
                         ],
                         [
                             'id'  => $p->id,
-                            'email'  => mb_convert_encoding($p->correo, 'UTF-8', 'auto'),
+                            'email'  => $p->correo,
                             'identity_document' => $p->cedula_no=='' ? null : $p->cedula_no,
-                            'first_name'  => mb_convert_encoding($p->nombre, 'UTF-8', 'auto'),
-                            'last_name'  => mb_convert_encoding($p->apellido, 'UTF-8', 'auto'),
+                            'first_name'  => $p->nombre ?? "",
+                            'last_name'  => $p->apellido ?? "sin apellido",
                             'birth_date'  =>$this->parseDate($p->fecha_nacimiento) ? $this->parseDate($p->fecha_nacimiento) : now(),
-                            'mobile'  => mb_convert_encoding($p->celular, 'UTF-8', 'auto'),
-                            'phone'  => mb_convert_encoding($p->telefono, 'UTF-8', 'auto'),
+                            'mobile'  => $p->celular ?? "",
+                            'phone'  => $p->telefono ?? "",
                             'token'       => rand(1000, 9999),
                             'gender'      => $this->mapSexo($p->sexo),
-                            'civil_status'=> $this->mapEstadoCivil($p->estado_civil),
-                            'address'  => mb_convert_encoding($p->direccion ?? "", 'UTF-8', 'auto'),
-                            'occupation'  => mb_convert_encoding($p->ocupacion, 'UTF-8', 'auto'),
-                            'comment'  => mb_convert_encoding($p->comentario ?? "", 'UTF-8', 'auto'),
+                            'civil_status'=> $p->estado_civil,
+                            'address'  => $p->direccion ?? "",
+                            'occupation'  => $p->ocupacion ?? "",
+                            'comment'  => $p->comentario ?? "",
                             'branch_id'   => $p->centro_id ==0 || $p->centro_id == null ? 1 : $p->centro_id, // por defecto
                             //'patient_group_id' => $p->grupo ?? null,
                         ]);
@@ -80,13 +80,5 @@ class MigratePatients extends BaseCommand
         };
     }
 
-    private function mapEstadoCivil($estado)
-    {
-        return match($estado) {
-            0 => 'Soltero',
-            1 => 'Casado',
-            2 => 'Viudo',
-            default => null,
-        };
-    }
+
 }

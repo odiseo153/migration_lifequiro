@@ -49,10 +49,6 @@ class BaseModel extends Model
     {
         return $query->whereBetween('created_at', [$startDate, $endDate]);
     }
-    public function setNameAttribute($value)
-    {
-        $this->attributes['name'] = trim(strtolower($value));
-    }
 
     public function getNameAttribute($value)
     {

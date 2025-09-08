@@ -34,11 +34,11 @@ class MigrateCentros extends BaseCommand
                     'id'  => $centro->id,
                 ], [
                     'id'  => $centro->id,
-                    'name'  => mb_convert_encoding($centro->nombre, 'UTF-8', 'auto'),
+                    'name'  => $centro->nombre,
                     'company_id'   => 8, // company_id 8 es la empresa de Quirocita
                     'phone'  => $centro->telefono,
                     'code' => $centro->codigo,
-                    'address' => mb_convert_encoding($centro->direccion, 'UTF-8', 'auto'),
+                    'address' => $centro->direccion,
                 ]);
             }
         });

@@ -12,7 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('patients', function (Blueprint $table) {
-            //
             $table->integer('identity_document_type')->nullable()->change();
             $table->integer('civil_status')->nullable()->change();
         });
