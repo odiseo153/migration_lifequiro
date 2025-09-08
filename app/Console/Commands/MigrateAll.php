@@ -3,6 +3,10 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use App\Console\Commands\MigrateCentros;
+use App\Console\Commands\MigratePatients;
+use App\Console\Commands\MigratePlanes;
+use App\Console\Commands\MigratePlanesAsignados;
 
 class MigrateAll extends Command
 {
@@ -26,9 +30,9 @@ class MigrateAll extends Command
     public function handle()
     {
         //
-        MigrateCentros::handle();
-        MigratePatients::handle();
-        MigratePlanes::handle();
-        MigratePlanesAsignados::handle();
+        $this->call('migrate:centros');
+        $this->call('migrate:patients');
+        $this->call('migrate:planes');
+        $this->call('migrate:planes-asignados');
     }
 }
