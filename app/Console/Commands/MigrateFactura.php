@@ -51,7 +51,7 @@ class MigrateFactura extends BaseCommand
                     'type_of_tax_receipt_id'  => 1,
                     'no_invoice'  => $f->factura_no ,
                     'invoice_token'  => $f->no_comprobante == '' || $f->no_comprobante ==0 ?'GENERATED-'. $this->generateRandomCode(Invoice::class,8,'invoice_token') : $f->no_comprobante,
-                    'total'  => $f->monto =='' || $f->monto ==null ? 0 : $f->monto,
+                    'total'  => $f->monto =='' || $f->monto ==null ? 0 : (int) $f->monto,
                     'note'  => $f->observacion,
                     'pre_authorization_id'  => $f->pre_autorizacion_id,
                     'created_at'  =>$f->fecha == '0000-00-00 00:00:00' ? now() : $f->fecha,
@@ -61,7 +61,7 @@ class MigrateFactura extends BaseCommand
                 PlanTransaction::create([
                     'assigned_plan_id' => $f->ajuste_plan_id,
                     'patient_id' => $f->paciente_id,
-                    'amount' => $f->monto =='' || $f->monto ==null ? 0 : $f->monto,
+                    'amount' => $f->monto =='' || $f->monto ==null ? 0 : (int) $f->monto,
                     'transaction_type' => 'factura de abono a plan, de migracion',
                     'description' => 'Factura',
                 ]);
