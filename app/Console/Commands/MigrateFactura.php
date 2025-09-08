@@ -45,7 +45,7 @@ class MigrateFactura extends BaseCommand
                 ], [
                     'id' => $f->id,
                     'patient_id'  => $f->paciente_id,
-                    'branch_id'  => $f->centro_id,
+                    'branch_id'  => $f->centro_id ==0 ? 1 : $f->centro_id,
                     'payment_method_id'  => $this->DeterminePaymentType($f->tipo),
                     'transaction_type_id'  => $this->DetermineTransactionType($f),
                     'type_of_tax_receipt_id'  => 1,
