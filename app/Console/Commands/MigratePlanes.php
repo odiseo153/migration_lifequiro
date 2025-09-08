@@ -23,7 +23,7 @@ class MigratePlanes extends BaseCommand
                     'code'   => $p->codigo ?? 'GENERATED-'.$this->generateRandomCode(Plan::class,8,'code'),
                     'price'  => $p->precio ?? 0,
                     'total_sessions' => $p->total_sessiones_plan ?? 0,
-                    'type_of_plan_id'       => $p->tipo ,
+                    'type_of_plan_id'       => $p->tipo ==0 ? 1 :$p->tipo ,
                     'therapies_number'       => $p->total_terapia_fisica ?? 0,
                     'number_installments'       => $p->cuotas_pagos ?? 0,
                     'duration' => $p->tiempo ?? 0,
