@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Company;
 use App\Models\Branch;
 use App\Models\Legacy\Centro;
 
@@ -29,12 +28,14 @@ class MigrateCentros extends BaseCommand
     {
         $this->info("Iniciando migración de centros...");
 
-        Centro::chunk(500, function ($pacientes) {
+        Centro::chunk(100, function ($pacientes) {
             foreach ($pacientes as $p) {
-                Branch::create([
+                Branch::updateOrCreate([
+                    'id'  => $p->id,
+                ], [
                     'id'  => $p->id,
                     'name'  => mb_convert_encoding($p->nombre, 'UTF-8', 'auto'),
-                    'company_id'   => 8,
+                    'company_id'   => 8, // company_id 8 es la empresa de Quirocita
                     'phone'  => $p->telefono,
                     'code' => $p->codigo,
                     'address' => mb_convert_encoding($p->direccion, 'UTF-8', 'auto'),
@@ -42,6 +43,6 @@ class MigrateCentros extends BaseCommand
             }
         });
 
-        $this->info("Migración completada.");
+        $this->info("Migración de centros completada.");
     }
 }
