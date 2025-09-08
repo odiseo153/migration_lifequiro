@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Company;
 use App\Models\Branch;
 use App\Models\Legacy\Centro;
 
@@ -33,7 +34,9 @@ class MigrateCentros extends BaseCommand
                 Branch::create([
                     'id'  => $p->id,
                     'name'  => mb_convert_encoding($p->nombre, 'UTF-8', 'auto'),
-                    'company_id'   => 1,
+                    'company_id'   => Company::factory([
+                        'name' => 'Lifequiro',
+                    ])->create()->id,
                     'phone'  => $p->telefono,
                     'code' => $p->codigo,
                     'address' => mb_convert_encoding($p->direccion, 'UTF-8', 'auto'),

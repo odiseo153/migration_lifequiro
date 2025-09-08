@@ -18,7 +18,7 @@ class MigratePlanesAsignados extends BaseCommand
     {
         $this->info("Iniciando migración de planes asignados...");
 
-        Ajuste::chunk(500, function ($pacientes) {
+        Ajuste::chunk(100, function ($pacientes) {
             foreach ($pacientes as $p) {
                 // Verificar si el paciente existe
                 if (!Patient::find($p->paciente_id)) {

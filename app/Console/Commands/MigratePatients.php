@@ -11,9 +11,9 @@ class MigratePatients extends BaseCommand
 
     public function handle()
     {
-        $this->info("Iniciando migración...");
+        $this->info("Iniciando migración de pacientes...");
 
-        Paciente::chunk(500, function ($pacientes) {
+        Paciente::chunk(100, function ($pacientes) {
             foreach ($pacientes as $p) {
                 try {
                     Patient::updateOrCreate(
@@ -48,7 +48,7 @@ class MigratePatients extends BaseCommand
             }
         });
 
-        $this->info("Migración completada.");
+        $this->info("Migración de pacientes completada.");
     }
 
     private function parseDate($fecha)

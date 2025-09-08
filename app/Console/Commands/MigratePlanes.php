@@ -13,7 +13,7 @@ class MigratePlanes extends BaseCommand
     {
         $this->info("Iniciando migración de planes...");
 
-        Planes::chunk(500, function ($pacientes) {
+        Planes::chunk(100, function ($pacientes) {
             foreach ($pacientes as $p) {
                 Plan::updateOrCreate([
                     'id'  => $p->id,
@@ -35,7 +35,7 @@ class MigratePlanes extends BaseCommand
             }
         });
 
-        $this->info("Migración completada.");
+        $this->info("Migración de planes completada.");
     }
 
 
