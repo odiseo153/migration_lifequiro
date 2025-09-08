@@ -32,7 +32,7 @@ class MigratePatients extends BaseCommand
                             'token'       => rand(1000, 9999),
                             'gender'      => $this->mapSexo($p->sexo),
                             'civil_status'=> $this->mapEstadoCivil($p->estado_civil),
-                            'address'  => mb_convert_encoding($p->direccion, 'UTF-8', 'auto'),
+                            'address'  => mb_convert_encoding($p->direccion ?? "", 'UTF-8', 'auto'),
                             'occupation'  => mb_convert_encoding($p->ocupacion, 'UTF-8', 'auto'),
                             'comment'  => mb_convert_encoding($p->comentario ?? "", 'UTF-8', 'auto'),
                             'branch_id'   => $p->centro_id ==0 || $p->centro_id == null ? 1 : $p->centro_id, // por defecto
