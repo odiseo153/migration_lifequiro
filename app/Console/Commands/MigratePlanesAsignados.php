@@ -2,6 +2,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Item;
+use App\Models\Legacy\Planes;
 use App\Models\Plan;
 use App\Models\User;
 use App\Models\Patient;
@@ -25,6 +26,11 @@ class MigratePlanesAsignados extends BaseCommand
                 // Verificar si el paciente existe
                 if (!Patient::find($p->paciente_id)) {
                     $this->warn("Paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
+                    continue;
+                }
+
+                if (!Planes::find($p->plan_id)) {
+                    $this->warn("Plan no encontrado - ID: {$p->plan_id}. Omitiendo registro.");
                     continue;
                 }
 
