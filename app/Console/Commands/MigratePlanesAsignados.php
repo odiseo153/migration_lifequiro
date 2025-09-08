@@ -8,6 +8,7 @@ use App\Models\Patient;
 use App\Models\Legacy\Ajuste;
 use App\Models\{AssignedPlan};
 use App\Models\AcquiredService;
+use App\Models\DescuentAuthorization;
 
 class MigratePlanesAsignados extends BaseCommand
 {
@@ -18,13 +19,15 @@ class MigratePlanesAsignados extends BaseCommand
     {
         $this->info("Iniciando migración de planes asignados...");
 
-        Ajuste::chunk(100, function ($pacientes) {
+        Ajuste::chunk(500, function ($pacientes) {
+            $user=User::factory()->create();
             foreach ($pacientes as $p) {
                 // Verificar si el paciente existe
                 if (!Patient::find($p->paciente_id)) {
                     $this->warn("Paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
                     continue;
                 }
+
 
                 $assignedPlan = AssignedPlan::updateOrCreate(
                     [
@@ -43,7 +46,7 @@ class MigratePlanesAsignados extends BaseCommand
                     'number_installments' => Plan::find($p->plan_id)->number_installments ?? 0,
                     'status' => $p->estado,
                     'branch_id' => $p->centro_id,
-                    'user_id' => User::first()->id,
+                    'user_id' => $user->id,
                     'card_commission' => $p->card_fee,
                     'bank_commission' => $p->bank_fee,
                     'other_commission' => $p->other_fee,
@@ -51,18 +54,37 @@ class MigratePlanesAsignados extends BaseCommand
                     'updated_at' => $this->parseDateInt($p->fecha_cre),
                 ]);
 
-                $assignedPlan->transactions()->create([
-                    'assigned_plan_id' => $assignedPlan->id,
-                    'patient_id' => $p->paciente_id,
-                    'amount' => $p->consumido,
-                    'transaction_type' => 'entrada',
-                    'description' => 'Plan asignado',
-                ]);
+            /*
+                    $assignedPlan->transactions()->create([
+                        'assigned_plan_id' => $assignedPlan->id,
+                        'patient_id' => $p->paciente_id,
+                        'amount' => $p->consumido,
+                        'transaction_type' => 'entrada',
+                        'description' => 'Plan asignado',
+                    ]);
+                    if ($p->descuento != 0) {
+                        for ($i = 0; $i < $p->descuento; $i++) {
+                            DescuentAuthorization::create([
+                                'patient_id' => $p->paciente_id,
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'type' => 1,
+                                'request_amount' => $p->descuento,
+                                'approved_amount' => $p->descuento,
+                                'status' => 2,
+                                'request_by' => $user->id,
+                                'authorized_by' => $user->id,
+                                'authorized_at' => now(),
+                                'created_at' => $this->parseDateInt($p->fecha_cre),
+                                'updated_at' => $this->parseDateInt($p->fecha_cre),
+                            ]);
+                        }
+                    }
+            */
 
                 $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
                 $priceTerapia = $p->terapia_fisica > 0 ? $p->consumido / $p->terapia_fisica : 0;
 
-                if ($p->sessiones_utilizadas) {
+                if ($p->sessiones_utilizadas != 0) {
                     for ($i = 0; $i < $p->sessiones_utilizadas; $i++) {
                         AcquiredService::create([
                             'patient_id' => $p->paciente_id,
@@ -74,7 +96,8 @@ class MigratePlanesAsignados extends BaseCommand
                     }
                 }
 
-                if ($p->terapias_utilizadas) {
+
+                if ($p->terapias_utilizadas != 0) {
                     for ($i = 0; $i < $p->terapias_utilizadas; $i++) {
                         AcquiredService::create([
                             'patient_id' => $p->paciente_id,
@@ -85,6 +108,8 @@ class MigratePlanesAsignados extends BaseCommand
                         ]);
                     }
                 }
+
+
             }
         });
 
