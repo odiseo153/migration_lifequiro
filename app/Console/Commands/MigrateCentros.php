@@ -28,17 +28,17 @@ class MigrateCentros extends BaseCommand
     {
         $this->info("Iniciando migración de centros...");
 
-        Centro::chunk(100, function ($pacientes) {
-            foreach ($pacientes as $p) {
+        Centro::chunk(100, function ($centros) {
+            foreach ($centros as $centro) {
                 Branch::updateOrCreate([
-                    'id'  => $p->id,
+                    'id'  => $centro->id,
                 ], [
-                    'id'  => $p->id,
-                    'name'  => mb_convert_encoding($p->nombre, 'UTF-8', 'auto'),
+                    'id'  => $centro->id,
+                    'name'  => mb_convert_encoding($centro->nombre, 'UTF-8', 'auto'),
                     'company_id'   => 8, // company_id 8 es la empresa de Quirocita
-                    'phone'  => $p->telefono,
-                    'code' => $p->codigo,
-                    'address' => mb_convert_encoding($p->direccion, 'UTF-8', 'auto'),
+                    'phone'  => $centro->telefono,
+                    'code' => $centro->codigo,
+                    'address' => mb_convert_encoding($centro->direccion, 'UTF-8', 'auto'),
                 ]);
             }
         });

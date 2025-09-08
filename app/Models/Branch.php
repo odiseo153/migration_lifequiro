@@ -6,8 +6,8 @@ namespace App\Models;
 
 class Branch extends BaseModel
 {
-    
-    protected $fillable = ['company_id', 'name', 'address', 'phone', 'code'];
+
+    protected $fillable = ['id', 'company_id', 'name', 'address', 'phone', 'code'];
 
     public function company()
     {
@@ -33,7 +33,7 @@ class Branch extends BaseModel
     {
         return $this->belongsToMany(Offer::class,'offer_branch')->withTimestamps();
     }
-    
+
     public function schedules()
     {
         return $this->hasMany(Schedule::class);
