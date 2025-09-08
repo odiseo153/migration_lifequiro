@@ -9,7 +9,7 @@ use App\Traits\ModelHelperTrait;
 
 class BaseModel extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, ModelHelperTrait;
 
     protected $hidden = [ 'updated_at'];
 
