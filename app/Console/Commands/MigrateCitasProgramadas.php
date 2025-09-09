@@ -36,8 +36,9 @@ class MigrateCitasProgramadas extends BaseCommand
         CitasProgramadas::chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
                 $assignedPlan = AssignedPlan::whereNotIn('status', [PlanStatus::Desactivado->value, PlanStatus::Expirado->value,PlanStatus::Completado->value])->find($p->ajuste_plan_id);
+                $patient = Patient::find($p->paciente_id);
                 if (
-                    !$assignedPlan && $p->dias != '' && $p->horas != '' && !Patient::find($p->paciente_id)
+                    !$assignedPlan && $p->dias != '' && $p->horas != '' && !$patient
                 ) {
                     $this->warn("Plan no encontrado - ID: {$p->ajuste_plan_id}. Plan desactivado o expirado. Omitiendo registro.");
                     continue;
