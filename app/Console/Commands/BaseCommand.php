@@ -40,6 +40,18 @@ class BaseCommand extends Command
         }
     }
 
+    public function parseDate($timestamp)
+    {
+        try {
+            if (empty($timestamp) || !is_numeric($timestamp)) {
+                return null;
+            }
+            return \Carbon\Carbon::parse($timestamp);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
     public function generateRandomCode($model,$length = 8,$field = 'code')
     {
         $code = '';

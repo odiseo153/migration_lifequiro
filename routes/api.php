@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\Carbon;
 use App\Models\Patient;
 use Illuminate\Http\Request;
 use App\Models\Legacy\Centro;
@@ -14,17 +15,9 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::get('/migrate-all', function (Request $request) {
-MigrateCentros::handle();
-MigratePatients::handle();
-MigratePlanes::handle();
-MigratePlanesAsignados::handle();
 
-return 'Migración completada';
-});
 
 Route::get('/test', function (Request $request) {
-
-
-    return Planes::limit(10)->select('id','estado_civil','sexo')->get();
+$date=Carbon::parse('2021-08-05 15:36:21');
+return $date->format('H:i:s');
     });

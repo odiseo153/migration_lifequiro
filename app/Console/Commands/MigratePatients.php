@@ -6,12 +6,10 @@ use App\Models\Invoice;
 use App\Models\Patient;
 use App\Enums\PlanStatus;
 use App\Models\AssignedPlan;
-use App\Models\PaymentMethod;
 use App\Enums\TransactionType;
 use App\Models\Legacy\Factura;
 use App\Models\Legacy\Paciente;
 use App\Models\PlanTransaction;
-use App\Models\Legacy\Documentacion;
 
 class MigratePatients extends BaseCommand
 {
@@ -103,25 +101,7 @@ class MigratePatients extends BaseCommand
         $this->info("Migración de pacientes completada.");
     }
 
-    private function parseDate($fecha)
-    {
-        try {
-            if (empty($fecha) || $fecha === '0000-00-00' || $fecha === '0000-00-00 00:00:00') {
-                return null;
-            }
 
-            $parsed = \Carbon\Carbon::parse($fecha);
-
-            // Check if the year is valid (not negative or too old)
-            if ($parsed->year < 1900) {
-                return null;
-            }
-
-            return $parsed->format('Y-m-d');
-        } catch (\Exception $e) {
-            return null;
-        }
-    }
 
     private function mapSexo($sexo)
     {
