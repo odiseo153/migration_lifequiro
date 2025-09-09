@@ -35,15 +35,13 @@ class MigrateCitasProgramadas extends BaseCommand
 
         CitasProgramadas::chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
+                $assignedPlan = AssignedPlan::whereNotIn('status', [PlanStatus::Desactivado->value, PlanStatus::Expirado->value,PlanStatus::Completado->value])->find($p->ajuste_plan_id);
                 if (
-                    !AssignedPlan::
-                        whereNotIn('status', [PlanStatus::Desactivado->value, PlanStatus::Expirado->value,PlanStatus::Completado->value])
-                        ->find($p->ajuste_plan_id) && $p->dias != '' && $p->horas != '' && !Patient::find($p->paciente_id)
+                    !$assignedPlan && $p->dias != '' && $p->horas != '' && !Patient::find($p->paciente_id)
                 ) {
                     $this->warn("Plan no encontrado - ID: {$p->ajuste_plan_id}. Plan desactivado o expirado. Omitiendo registro.");
                     continue;
                 }
-                $assignedPlan = AssignedPlan::whereNotIn('status', [PlanStatus::Desactivado->value, PlanStatus::Expirado->value,PlanStatus::Completado->value])->find($p->ajuste_plan_id);
 
                 // Separar días y horas por comas
                 $days = explode(',', trim($p->dias, ','));
@@ -66,7 +64,7 @@ class MigrateCitasProgramadas extends BaseCommand
                     $dayName = $dayMapping[trim($day)] ?? null;
                     $hour = isset($hours[$index]) ? trim($hours[$index]) : null;
 
-                    if ($dayName && $hour) {
+                    if ($dayName && $hour && $assignedPlan) {
                         // Convertir hora de formato AM/PM a 24 horas
                         $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $hour)->format('H:i:s');
 
