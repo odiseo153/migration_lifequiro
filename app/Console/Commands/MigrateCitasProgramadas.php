@@ -38,7 +38,7 @@ class MigrateCitasProgramadas extends BaseCommand
                 $assignedPlan = AssignedPlan::whereNotIn('status', [PlanStatus::Desactivado->value, PlanStatus::Expirado->value,PlanStatus::Completado->value])->find($p->ajuste_plan_id);
                 $patient = Patient::find($p->paciente_id);
                 if (
-                    !$assignedPlan && $p->dias != '' && $p->horas != '' && !$patient
+                    !$assignedPlan && $p->dias != '' && $p->horas != '' && $patient==null
                 ) {
                     $this->warn("Plan no encontrado - ID: {$p->ajuste_plan_id}. Plan desactivado o expirado. Omitiendo registro.");
                     continue;
