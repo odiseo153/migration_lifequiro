@@ -77,7 +77,7 @@ class MigratePatients extends BaseCommand
                     );
 
 
-
+                    /*
                     $ars = Ars::find($p->grupo);
                     if ($ars) {
                         // $documentacion=Documentacion::where('paciente_id',$p->id)->first();
@@ -118,6 +118,7 @@ class MigratePatients extends BaseCommand
                         ]);
 
                     }
+                    */
 
                 } catch (\Illuminate\Database\QueryException $e) {
                     if ($e->errorInfo[1] == 1062) { // Duplicate entry error
