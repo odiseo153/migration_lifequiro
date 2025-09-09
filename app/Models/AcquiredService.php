@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\ServicesStatus;
-use App\Events\AcquiredServiceModificated;
 use App\Models\Appointment;
 
 class AcquiredService extends BaseModel
@@ -17,8 +15,6 @@ class AcquiredService extends BaseModel
         'plan_item_id',
         'assigned_plan_id'
     ];
-
-
 
     public function item()
     {

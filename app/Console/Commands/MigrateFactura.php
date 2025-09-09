@@ -35,10 +35,12 @@ class MigrateFactura extends BaseCommand
 
         Factura::chunk(500, function ($facturas) {
             foreach ($facturas as $f) {
+
                 if (!Patient::find($f->paciente_id)) {
                     $this->warn("Paciente no encontrado - ID: {$f->paciente_id}. Omitiendo registro.");
                     continue;
                 }
+
 
                 Invoice::updateOrCreate([
                     'id' => $f->id,
@@ -66,7 +68,6 @@ class MigrateFactura extends BaseCommand
                     'description' => 'Factura',
                 ]);
             }
-
 
             }
         });

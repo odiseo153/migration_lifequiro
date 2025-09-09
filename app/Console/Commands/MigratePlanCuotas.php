@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Legacy\PlanCuotas;
 use App\Models\AssignedPlan;
 use Illuminate\Console\Command;
-use App\Models\Legacy\PlanCuotas;
 use App\Models\Installment;
 
 class MigratePlanCuotas extends Command
@@ -30,20 +30,27 @@ class MigratePlanCuotas extends Command
     {
         $this->info("Iniciando migración de plan cuotas...");
 
-        PlanCuotas::limit(2)->chunk(500, function ($pacientes) {
+        PlanCuotas::chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
-                Installment::create([
+                if (!AssignedPlan::find($p->ajuste_id)) {
+                    $this->warn("Plan no encontrado - ID: {$p->ajuste_id}. Omitiendo registro.");
+                    continue;
+                }
+
+                Installment::updateOrCreate([
                     'id' => $p->id,
-                    'assigned_plan_id' => AssignedPlan::first()->id,
-                    'amount' => $p->monto,
-                    'date_paid' => $p->fecha_pago,
-                    'is_it_paid' => $p->status == 2 ? 1 : 0,
+                ], [
+                    'id' => $p->id,
+                    'assigned_plan_id' => $p->ajuste_id,
+                    'amount' =>(int) $p->monto,
+                    'date_paid' => $p->date,
+                    'is_it_paid' => $p->status == 2 ? true : false,
                     'created_at' => $p->date,
                 ]);
             }
         });
 
-        $this->info("Migración completada.");
+        $this->info("Migración completada de plan cuotas.");
 
     }
 }
