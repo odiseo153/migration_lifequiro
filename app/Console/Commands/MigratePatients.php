@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\Patient;
 use App\Enums\PlanStatus;
 use App\Models\AssignedPlan;
+use App\Models\PatientGroup;
 use App\Models\WhereHeMetUs;
 use App\Enums\TransactionType;
 use App\Models\Legacy\Factura;
@@ -71,8 +72,8 @@ class MigratePatients extends BaseCommand
                             'occupation' => $p->ocupacion ?? "",
                             'comment' => $p->comentario ?? "",
                             'branch_id' => $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id, // por defecto
-                            'patient_group_id' => $p->grupo == 0 || $p->grupo == null ? null : $p->grupo,
-                            'where_met_us_id' => $where_met_us_id,
+                            'patient_group_id' => PatientGroup::find($p->grupo == 0 || $p->grupo == null ? null : $p->grupo),
+                            'where_met_us_id' =>WhereHeMetUs::find($where_met_us_id),
                         ]
                     );
 
