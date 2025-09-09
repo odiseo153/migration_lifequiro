@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Patient;
 use App\Enums\PlanStatus;
 use App\Models\AssignedPlan;
 use App\Models\ProgrammingHistory;
@@ -37,7 +38,7 @@ class MigrateCitasProgramadas extends BaseCommand
                 if (
                     !AssignedPlan::
                         whereNotIn('status', [PlanStatus::Desactivado->value, PlanStatus::Expirado->value,PlanStatus::Completado->value])
-                        ->find($p->ajuste_plan_id) && $p->dias != '' && $p->horas != ''
+                        ->find($p->ajuste_plan_id) && $p->dias != '' && $p->horas != '' && !Patient::find($p->paciente_id)
                 ) {
                     $this->warn("Plan no encontrado - ID: {$p->ajuste_plan_id}. Plan desactivado o expirado. Omitiendo registro.");
                     continue;
