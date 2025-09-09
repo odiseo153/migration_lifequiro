@@ -39,11 +39,25 @@ class MigrateCitasProgramadas extends BaseCommand
                 $patient = Patient::find($p->paciente_id);
 
                 if (
-                    $assignedPlan == null && $p->dias == '' && $p->horas == '' && $patient==null
+                     $patient==null
                 ) {
-                    $this->warn("Plan no encontrado - ID: {$p->ajuste_plan_id}. Plan desactivado o expirado. Omitiendo registro.");
+                    $this->warn("paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
                     continue;
                 }
+
+                if (
+                    $assignedPlan==null
+               ) {
+                   $this->warn("plan no encontrado - ID: {$p->ajuste_plan_id}. Omitiendo registro.");
+                   continue;
+               }
+
+               if (
+                $p->dias == '' && $p->horas == ''
+           ) {
+               $this->warn("dias y horas no encontrados - ID: {$p->id}. Omitiendo registro.");
+               continue;
+           }
 
                 // Separar días y horas por comas
                 $days = explode(',', trim($p->dias, ','));
