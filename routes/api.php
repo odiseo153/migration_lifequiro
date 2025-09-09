@@ -1,15 +1,11 @@
 <?php
 
 use Carbon\Carbon;
+use App\Models\User;
 use App\Models\Patient;
+use App\Models\WhereHeMetUs;
 use Illuminate\Http\Request;
-use App\Models\Legacy\Centro;
-use App\Models\Legacy\Paciente;
 use Illuminate\Support\Facades\Route;
-use App\Console\Commands\MigratePlanes;
-use App\Console\Commands\MigrateCentros;
-use App\Console\Commands\MigratePatients;
-use App\Console\Commands\MigratePlanesAsignados;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -18,6 +14,30 @@ Route::get('/user', function (Request $request) {
 
 
 Route::get('/test', function (Request $request) {
-$date=Carbon::parse('2021-08-05 15:36:21');
-return $date->format('H:i:s');
+$where_met_us_id = null;
+                    $is_refencia_acceptable = true;
+
+                    if ($is_refencia_acceptable) {
+                        $referencia = strtolower(trim('TarjetaPop'));
+
+                        $matches = WhereHeMetUs::all(); // todos los registros posibles
+                        $bestScore = 0;
+                        $bestMatchId = null;
+
+                        foreach ($matches as $match) {
+                            similar_text($referencia, strtolower($match->name), $percent);
+
+                            if ($percent > $bestScore) {
+                                $bestScore = $percent;
+                                $bestMatchId = $match->id;
+                            }
+                        }
+
+                        // Si encontramos algo con similitud aceptable (ej. más del 60%)
+                        if ($bestScore >= 60) {
+                            $where_met_us_id = $bestMatchId;
+                        }
+                    }
+
+return $where_met_us_id;
     });

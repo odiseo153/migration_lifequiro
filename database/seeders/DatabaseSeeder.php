@@ -48,6 +48,42 @@ class DatabaseSeeder extends Seeder
         $this->command->info('Iniciando la creación de datos iniciales...');
 
 
+
+        $statuses = [
+            ['state' => 'Completada', 'order' => 4, 'id' => 1],
+            ['state' => 'Programada', 'order' => 1, 'id' => 2],
+            ['state' => 'Pospuesta', 'order' => 5, 'id' => 3],
+            ['state' => 'No Asistió', 'order' => 6, 'id' => 4],
+            ['state' => 'Atendiendo', 'order' => 3, 'id' => 6],
+            ['state' => 'En Espera', 'order' => 2, 'id' => 7],
+            ['state' => 'Radiografía', 'order' => 8, 'id' => 8],
+            ['state' => 'Reprogramada', 'order' => 14, 'id' => 15],
+            ['state' => 'No Radiografía', 'order' => 15, 'id' => 16],
+            ['state' => 'Confirmada', 'order' => 17, 'id' => 18],
+            ['state' => 'Desactivada', 'order' => 18, 'id' => 19]
+        ];
+        Status::insert($statuses);
+        $this->command->info('- Estados (statuses) creados con éxito.');
+
+
+
+        // Crear Tipos de Citas
+        $typesOfAppointments = [
+            ['name' => 'Consulta', 'id' => 1],
+            ['name' => 'Radiografía', 'id' => 2],
+            ['name' => 'Reporte', 'id' => 3],
+            ['name' => 'MIP', 'id' => 4],
+            ['name' => 'MR', 'id' => 5],
+            ['name' => 'Analisis de Postura', 'id' => 6],
+            ['name' => 'Comparacion', 'id' => 7],
+            ['name' => 'Radiografía RC', 'id' => 8],
+        ];
+        TypeOfAppointments::insert($typesOfAppointments);
+        $this->command->info('- Tipos de citas creados con éxito.');
+
+
+        /*
+
         // Crear Tipos de Planes
         $typesOfPlans = [
             ['name' => 'Regular', 'id' => 1],
@@ -96,7 +132,7 @@ class DatabaseSeeder extends Seeder
         }
         $this->command->info('- Tipos de comprobantes fiscales creados con éxito.');
 
-        /*
+
         $this->command->info('- Seeders de roles, permisos y usuarios ejecutados.');
 
         // Crear Statuses

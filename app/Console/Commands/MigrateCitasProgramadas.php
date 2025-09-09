@@ -39,25 +39,25 @@ class MigrateCitasProgramadas extends BaseCommand
                 $patient = Patient::find($p->paciente_id);
 
                 if (
-                     $patient==null
+                    $patient == null
                 ) {
                     $this->warn("paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
                     continue;
                 }
 
                 if (
-                    $assignedPlan==null
-               ) {
-                   $this->warn("plan no encontrado o no esta activo - ID: {$p->ajuste_plan_id}. Omitiendo registro.");
-                   continue;
-               }
+                    $assignedPlan == null
+                ) {
+                    $this->warn("plan no encontrado o no esta activo - ID: {$p->ajuste_plan_id}. Omitiendo registro.");
+                    continue;
+                }
 
-               if (
-                $p->dias == '' && $p->horas == ''
-           ) {
-               $this->warn("dias y horas no encontrados - ID: {$p->id}. Omitiendo registro.");
-               continue;
-           }
+                if (
+                    $p->dias == '' && $p->horas == ''
+                ) {
+                    $this->warn("dias y horas no encontrados - ID: {$p->id}. Omitiendo registro.");
+                    continue;
+                }
 
                 // Separar días y horas por comas
                 $days = explode(',', trim($p->dias, ','));
@@ -75,7 +75,8 @@ class MigrateCitasProgramadas extends BaseCommand
 
                 // Crear un ProgrammingHistory por cada día
                 foreach ($days as $index => $day) {
-                    if (empty(trim($day))) continue; // Saltar días vacíos
+                    if (empty(trim($day)))
+                        continue; // Saltar días vacíos
 
                     $dayName = $dayMapping[trim($day)] ?? null;
                     $hour = isset($hours[$index]) ? trim($hours[$index]) : null;

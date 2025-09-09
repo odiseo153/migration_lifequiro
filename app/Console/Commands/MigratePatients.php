@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\Patient;
 use App\Enums\PlanStatus;
 use App\Models\AssignedPlan;
+use App\Models\WhereHeMetUs;
 use App\Enums\TransactionType;
 use App\Models\Legacy\Factura;
 use App\Models\Legacy\Paciente;
@@ -23,6 +24,33 @@ class MigratePatients extends BaseCommand
         Paciente::chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
                 try {
+
+                    $where_met_us_id = null;
+                    $is_refencia_acceptable = $p->referencia != '--' && $p->referencia != '';
+
+                    if ($is_refencia_acceptable) {
+                        $referencia = strtolower(trim($p->referencia));
+
+                        $matches = WhereHeMetUs::all(); // todos los registros posibles
+                        $bestScore = 0;
+                        $bestMatchId = null;
+
+                        foreach ($matches as $match) {
+                            similar_text($referencia, strtolower($match->name), $percent);
+
+                            if ($percent > $bestScore) {
+                                $bestScore = $percent;
+                                $bestMatchId = $match->id;
+                            }
+                        }
+
+                        // Si encontramos algo con similitud aceptable (ej. más del 60%)
+                        if ($bestScore >= 60) {
+                            $where_met_us_id = $bestMatchId;
+                        }
+                    }
+
+
                     $patient = Patient::updateOrCreate(
                         [
                             'id' => $p->id,
@@ -44,8 +72,11 @@ class MigratePatients extends BaseCommand
                             'comment' => $p->comentario ?? "",
                             'branch_id' => $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id, // por defecto
                             'patient_group_id' => $p->grupo ?? null,
+                            'where_met_us_id' => $where_met_us_id,
                         ]
                     );
+
+
 
                     $ars = Ars::find($p->grupo);
                     if ($ars) {
