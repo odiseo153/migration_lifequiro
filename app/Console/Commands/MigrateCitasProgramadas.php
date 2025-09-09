@@ -35,7 +35,7 @@ class MigrateCitasProgramadas extends BaseCommand
 
         CitasProgramadas::chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
-                $assignedPlan = AssignedPlan::whereNotIn('status', [PlanStatus::Desactivado->value, PlanStatus::Expirado->value,PlanStatus::Completado->value])->find($p->ajuste_plan_id);
+                $assignedPlan = AssignedPlan::whereIn('status', [PlanStatus::Activo->value])->find($p->ajuste_plan_id);
                 $patient = Patient::find($p->paciente_id);
 
                 if (
@@ -48,7 +48,7 @@ class MigrateCitasProgramadas extends BaseCommand
                 if (
                     $assignedPlan==null
                ) {
-                   $this->warn("plan no encontrado - ID: {$p->ajuste_plan_id}. Omitiendo registro.");
+                   $this->warn("plan no encontrado o no esta activo - ID: {$p->ajuste_plan_id}. Omitiendo registro.");
                    continue;
                }
 
