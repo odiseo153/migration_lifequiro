@@ -6,6 +6,7 @@ namespace App\Models;
 class ProgrammingHistory extends BaseModel
 {
     protected $fillable = [
+        'id',
         'day',
         'hour',
         'branch_id',
