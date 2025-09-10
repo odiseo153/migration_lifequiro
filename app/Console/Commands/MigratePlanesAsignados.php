@@ -91,20 +91,18 @@ class MigratePlanesAsignados extends BaseCommand
                             ]);
                     }
 
+                    Voucher::create([
+                        'assigned_plan_id' => $assignedPlan->id,
+                        'status' => 3,
+                        'quantity' => 1,
+                        'price' => $p->consumido,
+                        'created_at' => $this->parseDateInt($p->fecha_cre),
+                        'updated_at' => $this->parseDateInt($p->fecha_cre),
+                    ]);
+
+
                     $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
                     $priceTerapia = $p->terapia_fisica > 0 ? $p->consumido / $p->terapia_fisica : 0;
-
-                    if ($p->consumido != 0) {
-                        Voucher::create([
-                            'assigned_plan_id' => $assignedPlan->id,
-                            'status' => 3,
-                            'quantity' => 1,
-                            'price' => $p->consumido,
-                            'created_at' => $this->parseDateInt($p->fecha_cre),
-                            'updated_at' => $this->parseDateInt($p->fecha_cre),
-                        ]);
-                    }
-
 
                     if ($p->sessiones_utilizadas != 0) {
                         for ($i = 0; $i < $p->sessiones_utilizadas; $i++) {
@@ -117,7 +115,6 @@ class MigratePlanesAsignados extends BaseCommand
                             ]);
                         }
                     }
-
 
                     if ($p->terapias_utilizadas != 0) {
                         for ($i = 0; $i < $p->terapias_utilizadas; $i++) {
