@@ -76,7 +76,6 @@ class MigratePlanesAsignados extends BaseCommand
                     ]);
 
                     if ($p->descuento != 0) {
-                        for ($i = 0; $i < $p->descuento; $i++) {
                             DescuentAuthorization::create([
                                 'patient_id' => $p->paciente_id,
                                 'assigned_plan_id' => $assignedPlan->id,
@@ -90,7 +89,6 @@ class MigratePlanesAsignados extends BaseCommand
                                 'created_at' => $this->parseDateInt($p->fecha_cre),
                                 'updated_at' => $this->parseDateInt($p->fecha_cre),
                             ]);
-                        }
                     }
 
                     $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
