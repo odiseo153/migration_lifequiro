@@ -1,13 +1,17 @@
 <?php
 namespace App\Console\Commands;
 
+use App\Enums\AppointmentStatus;
 use App\Models\Ars;
 use App\Models\Invoice;
 use App\Models\Patient;
 use App\Enums\PlanStatus;
+use App\Models\Appointment;
+use App\Models\Legacy\Cita;
 use App\Models\AssignedPlan;
 use App\Models\PatientGroup;
 use App\Models\WhereHeMetUs;
+use App\Enums\AppointmentType;
 use App\Enums\TransactionType;
 use App\Models\Legacy\Factura;
 use App\Models\Legacy\Paciente;
@@ -78,6 +82,32 @@ class MigratePatients extends BaseCommand
                         ]
                     );
 
+                $CitaTipoOld=[
+                    1=>AppointmentType::CONSULTA->value,
+                    2=>AppointmentType::RADIOGRAFIA->value,
+                    3=>AppointmentType::REPORTE->value,
+                    4=>AppointmentType::MIP->value,
+                    5=>AppointmentType::MR->value,
+                    6=>AppointmentType::COMPARACION->value,
+                    7=>AppointmentType::MR->value,
+                ];
+
+                $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $last_appointment_old->hora)->format('H:i:s');
+
+        $last_appointment_old=Cita::
+        where('estado_id',AppointmentStatus::COMPLETADA->value)
+        ->where('paciente_id',$p->id)->orderBy('fecha','desc')->first();
+
+        Appointment::create([
+                'note' => 'Cita de migracion',
+                'patient_id' => $p->id,
+                'branch_id' => $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id,
+                'type_of_appointment_id' => $CitaTipoOld[$last_appointment_old->tipo],
+                'status_id' => $last_appointment_old->estado_id,
+                'date' => $this->parseDateInt($last_appointment_old->dia),
+                'hour' => $hourFormatted,
+                'created_at' => $last_appointment_old->fecha,
+            ]);
 
                     /*
                     $ars = Ars::find($p->grupo);
