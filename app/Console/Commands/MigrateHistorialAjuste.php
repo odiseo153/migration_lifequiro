@@ -94,13 +94,38 @@ class MigrateHistorialAjuste extends Command
                         $zonas = explode(',', $historial->zonas);
                         foreach ($zonas as $zona) {
                             $zona = trim($zona);
+
+                            // Check for cervical vertebrae (c1, c2, etc)
                             if (preg_match('/^c\d+/i', $zona)) {
                                 $cervicalVertebrae[] = $zona;
-                            } elseif (preg_match('/^d\d+/i', $zona)) {
+                                // Add "right" modifier if present
+                                if (stripos($zona, 'right') !== false) {
+                                    $cervicalVertebrae[] = 'right';
+                                }
+                            }
+                            // Check for thoracic/dorsal vertebrae (d3, d4, etc)
+                            elseif (preg_match('/^d\d+/i', $zona)) {
                                 $thoracicVertebrae[] = $zona;
-                            } elseif (preg_match('/^l\d+/i', $zona)) {
+                                if (stripos($zona, 'right') !== false) {
+                                    $thoracicVertebrae[] = 'right';
+                                }
+                            }
+                            // Check for lumbar vertebrae (l2, l3, etc)
+                            elseif (preg_match('/^l\d+/i', $zona)) {
                                 $lumbarVertebrae[] = $zona;
-                            } else {
+                                if (stripos($zona, 'right') !== false) {
+                                    $lumbarVertebrae[] = 'right';
+                                }
+                            }
+                            // Handle sacral vertebrae and other modifiers
+                            elseif (preg_match('/^s/i', $zona)) {
+                                $lumbarVertebrae[] = $zona;
+                                if (stripos($zona, 'right') !== false) {
+                                    $lumbarVertebrae[] = 'right';
+                                }
+                            }
+                            // Add any remaining modifiers to cervical
+                            else {
                                 $cervicalVertebrae[] = $zona;
                             }
                         }
