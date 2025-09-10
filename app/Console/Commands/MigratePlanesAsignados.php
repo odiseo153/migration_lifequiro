@@ -90,7 +90,7 @@ class MigratePlanesAsignados extends BaseCommand
                     }
 
                     // Calcular precio por ítem como en la función find()
-                    $total_items = $assignedPlan->plan->total_sessions;
+                    $total_items = $assignedPlan->plan->total_sessions + $assignedPlan->therapies_number;
                     $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
 
                     // Calcular cuántos vouchers necesitamos crear basado en el consumo total
@@ -98,7 +98,6 @@ class MigratePlanesAsignados extends BaseCommand
 
                     // Crear vouchers individuales para que el cálculo de consumo sea correcto
                     if ($total_consumed_items != 0) {
-
                         for ($i = 0; $i < $total_consumed_items; $i++) {
                             Voucher::create([
                                 'assigned_plan_id' => $assignedPlan->id,
