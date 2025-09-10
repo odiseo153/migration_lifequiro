@@ -93,17 +93,33 @@ class MigratePlanesAsignados extends BaseCommand
                     $total_items = $assignedPlan->plan->total_sessions + $assignedPlan->therapies_number;
                     $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
 
-                    // Calcular cuántos vouchers necesitamos crear basado en el consumo total
+                    // Calcular cuántos vouchers necesitamos crear para que el consumo sea igual a $p->consumido
                     $total_consumed_items = (int) $p->sesiones_utilizadas + (int) $p->terapias_utilizadas;
 
-                    // Crear vouchers individuales para que el cálculo de consumo sea correcto
-                    if ($total_consumed_items != 0) {
-                        for ($i = 0; $i < $total_consumed_items; $i++) {
+                    // Crear vouchers para que count(vouchers) * $item_price = $p->consumido
+                    if ($p->consumido > 0 && $item_price > 0) {
+                        // Calcular cuántos vouchers necesitamos: consumido / precio_por_item
+                        $vouchers_needed = round($p->consumido / $item_price);
+
+                        for ($i = 0; $i < $vouchers_needed; $i++) {
                             Voucher::create([
                                 'assigned_plan_id' => $assignedPlan->id,
                                 'status' => 3,
                                 'quantity' => 1,
                                 'price' => $item_price,
+                                'created_at' => $this->parseDateInt($p->fecha_cre),
+                            ]);
+                        }
+                    } elseif ($p->consumido > 0 && $total_consumed_items > 0) {
+                        // Si item_price es 0 pero hay consumo, crear vouchers con el precio unitario del consumo
+                        $price_per_voucher = $p->consumido / $total_consumed_items;
+
+                        for ($i = 0; $i < $total_consumed_items; $i++) {
+                            Voucher::create([
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'status' => 3,
+                                'quantity' => 1,
+                                'price' => $price_per_voucher,
                                 'created_at' => $this->parseDateInt($p->fecha_cre),
                             ]);
                         }
