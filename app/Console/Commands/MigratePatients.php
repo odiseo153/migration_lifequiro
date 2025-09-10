@@ -17,7 +17,6 @@ use App\Models\Legacy\Paciente;
 use App\Models\PlanTransaction;
 use App\Enums\AppointmentStatus;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class MigratePatients extends BaseCommand
 {
@@ -47,7 +46,7 @@ class MigratePatients extends BaseCommand
         // Obtener todas las últimas citas de una vez para mejorar rendimiento
         $lastAppointments = Cita::select('paciente_id', 'tipo', 'estado_id', 'hora', 'dia', 'fecha')
             ->where('estado_id', AppointmentStatus::COMPLETADA->value)
-            ->whereIn('id', function($query) {
+            ->whereIn('id', function ($query) {
                 $query->select(\DB::raw('MAX(id)'))
                     ->from('cita')
                     ->where('estado_id', AppointmentStatus::COMPLETADA->value)
@@ -61,7 +60,7 @@ class MigratePatients extends BaseCommand
             $appointmentsToInsert = [];
 
             foreach ($pacientes as $p) {
-$branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
+                $branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
                 try {
 
                     $where_met_us_id = null;
@@ -92,7 +91,7 @@ $branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
                         'identity_document' => $p->cedula_no == '' ? null : $p->cedula_no,
                         'first_name' => $p->nombre ?? "",
                         'last_name' => $p->apellido ?? "sin apellido",
-                        'birth_date' => $this->parseDate($p->fecha_nacimiento) ,
+                        'birth_date' => $this->parseDate($p->fecha_nacimiento),
                         'mobile' => $p->celular ?? "",
                         'phone' => $p->telefono ?? "",
                         'token' => rand(1000, 9999),
@@ -146,27 +145,30 @@ $branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
 
             // Inserción batch de pacientes
             if (!empty($patientsToInsert)) {
-                try {
                     Patient::upsert($patientsToInsert, ['id'], [
-                        'email', 'identity_document', 'first_name', 'last_name', 'birth_date',
-                        'mobile', 'phone', 'token', 'gender', 'civil_status', 'address',
-                        'occupation', 'comment', 'branch_id', 'patient_group_id',
-                        'where_met_us_id', 'updated_at'
+                        'email',
+                        'identity_document',
+                        'first_name',
+                        'last_name',
+                        'birth_date',
+                        'mobile',
+                        'phone',
+                        'token',
+                        'gender',
+                        'civil_status',
+                        'address',
+                        'occupation',
+                        'comment',
+                        'branch_id',
+                        'patient_group_id',
+                        'where_met_us_id',
+                        'updated_at'
                     ]);
-                    $this->info("Insertados/actualizados " . count($patientsToInsert) . " pacientes");
-                } catch (\Exception $e) {
-                    $this->error("Error en inserción batch de pacientes: " . $e->getMessage());
-                }
             }
 
             // Inserción batch de citas
             if (!empty($appointmentsToInsert)) {
-                try {
                     Appointment::insert($appointmentsToInsert);
-                    $this->info("Insertadas " . count($appointmentsToInsert) . " citas");
-                } catch (\Exception $e) {
-                    Log::error("Error en inserción batch de citas: " . $e->getMessage());
-                }
             }
         });
 
