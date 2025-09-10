@@ -92,7 +92,7 @@ class MigratePlanesAsignados extends BaseCommand
                     }
 
                     // Calcular precio por ítem como en la función find()
-                    $total_items = ($assignedPlan->plan->total_sessions ?? 0) + $assignedPlan->therapies_number;
+                    $total_items = $assignedPlan->plan->total_sessions + $assignedPlan->therapies_number;
                     $item_price = $total_items > 0 ? $assignedPlan->amount / $total_items : 0;
 
                     // Calcular cuántos vouchers necesitamos crear basado en el consumo total
@@ -117,13 +117,25 @@ class MigratePlanesAsignados extends BaseCommand
                     $priceTerapia = $item_price;
 
                     if ($p->sessiones_utilizadas != 0) {
-                        $item = Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first()->id;
+                        $itemAjuste = Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first();
+
+                        if (!$itemAjuste) {
+                            $this->warn("Item de AJUSTE con plan=true no encontrado. Creando uno...");
+                            $itemAjuste = Item::create([
+                                'name' => 'Ajuste (Plan)',
+                                'code' => 'AJUSTE_PLAN',
+                                'plan' => true,
+                                'type_of_item_id' => ItemType::AJUSTE->value,
+                                'price' => $priceAjuste,
+                            ]);
+                        }
+
                         $sessiones = (int) $p->sessiones_utilizadas;
                         for ($i = 0; $i < $sessiones; $i++) {
                             AcquiredService::create([
                                 'patient_id' => $p->paciente_id,
                                 'assigned_plan_id' => $assignedPlan->id,
-                                'plan_item_id' => $item,
+                                'plan_item_id' => $itemAjuste->id,
                                 'price' => $priceAjuste,
                                 'status' => ServicesStatus::COMPLETADA->value,
                             ]);
@@ -131,14 +143,25 @@ class MigratePlanesAsignados extends BaseCommand
                     }
 
                     if ($p->terapias_utilizadas != 0) {
+                        $itemTerapia = Item::where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first();
+
+                        if (!$itemTerapia) {
+                            $this->warn("Item de TERAPIA_FISICA con plan=true no encontrado. Creando uno...");
+                            $itemTerapia = Item::create([
+                                'name' => 'Terapia Física (Plan)',
+                                'code' => 'TERAPIA_PLAN',
+                                'plan' => true,
+                                'type_of_item_id' => ItemType::TERAPIA_FISICA->value,
+                                'price' => $priceTerapia,
+                            ]);
+                        }
+
                         $terapias = (int) $p->terapias_utilizadas;
                         for ($i = 0; $i < $terapias; $i++) {
-                            $itemTerapia = Item::where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first()->id;
-
                             AcquiredService::create([
                                 'patient_id' => $p->paciente_id,
                                 'assigned_plan_id' => $assignedPlan->id,
-                                'plan_item_id' => $itemTerapia,
+                                'plan_item_id' => $itemTerapia->id,
                                 'price' => $priceTerapia,
                                 'status' => ServicesStatus::COMPLETADA->value,
                             ]);
