@@ -57,10 +57,10 @@ class MigratePatients extends BaseCommand
                             'id' => $p->id,
                         ],
                         [
-'id' => $p->id,
-'email' => $p->correo,
-'identity_document' => $p->cedula_no == '' ? null : $p->cedula_no,
-'first_name' => $p->nombre ?? "",
+                            'id' => $p->id,
+                            'email' => $p->correo,
+                            'identity_document' => $p->cedula_no == '' ? null : $p->cedula_no,
+                            'first_name' => $p->nombre ?? "",
                             'last_name' => $p->apellido ?? "sin apellido",
                             'birth_date' => $this->parseDate($p->fecha_nacimiento) ? $this->parseDate($p->fecha_nacimiento) : now(),
                             'mobile' => $p->celular ?? "",
@@ -73,8 +73,8 @@ class MigratePatients extends BaseCommand
                             'comment' => $p->comentario ?? "",
                             'branch_id' => $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id, // por defecto
                             'patient_group_id' => PatientGroup::find($p->grupo)?->id ?? 1,
-                            'where_met_us_id' =>WhereHeMetUs::find($where_met_us_id)?->id ?? 1,
-                            'created_at' => $p->fecha == '0000-00-00 00:00:00' ? now() : $this->parseDateInt($p->fecha),
+                            'where_met_us_id' => WhereHeMetUs::find($where_met_us_id)?->id ?? 1,
+                            'created_at' => $p->fecha == null ? now() : $this->parseDateInt($p->fecha),
                         ]
                     );
 

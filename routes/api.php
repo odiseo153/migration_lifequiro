@@ -14,30 +14,6 @@ Route::get('/user', function (Request $request) {
 
 
 Route::get('/test', function (Request $request) {
-$where_met_us_id = null;
-                    $is_refencia_acceptable = true;
 
-                    if ($is_refencia_acceptable) {
-                        $referencia = strtolower(trim('TarjetaPop'));
-
-                        $matches = WhereHeMetUs::all(); // todos los registros posibles
-                        $bestScore = 0;
-                        $bestMatchId = null;
-
-                        foreach ($matches as $match) {
-                            similar_text($referencia, strtolower($match->name), $percent);
-
-                            if ($percent > $bestScore) {
-                                $bestScore = $percent;
-                                $bestMatchId = $match->id;
-                            }
-                        }
-
-                        // Si encontramos algo con similitud aceptable (ej. más del 60%)
-                        if ($bestScore >= 60) {
-                            $where_met_us_id = $bestMatchId;
-                        }
-                    }
-
-return $where_met_us_id;
+return  \Carbon\Carbon::createFromTimestamp(1480168148)->format('Y-m-d H:i:s');
     });

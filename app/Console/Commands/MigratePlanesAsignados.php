@@ -2,11 +2,13 @@
 namespace App\Console\Commands;
 
 use App\Models\Item;
-use App\Models\Legacy\Planes;
 use App\Models\Plan;
 use App\Models\User;
+use App\Enums\ItemType;
 use App\Models\Patient;
+use App\Enums\ServicesStatus;
 use App\Models\Legacy\Ajuste;
+use App\Models\Legacy\Planes;
 use App\Models\{AssignedPlan};
 use App\Models\AcquiredService;
 use App\Models\DescuentAuthorization;
@@ -21,82 +23,85 @@ class MigratePlanesAsignados extends BaseCommand
         $this->info("Iniciando migración de planes asignados...");
 
         Ajuste::chunk(500, function ($pacientes) {
-            $user=User::factory()->create();
+
+            $user = User::factory()->create();
             foreach ($pacientes as $p) {
-                // Verificar si el paciente existe
-                if (!Patient::find($p->paciente_id)) {
-                    $this->warn("Paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
-                    continue;
-                }
-
-                if (!Planes::find($p->plan_id)) {
-                    $this->warn("Plan no encontrado - ID: {$p->plan_id}. Omitiendo registro.");
-                    continue;
-                }
-
-
-                $assignedPlan = AssignedPlan::updateOrCreate(
-                    [
-                    'id' => $p->id,
-                    ],
-                    [
-                    'id' => $p->id,
-                    'plan_id' => $p->plan_id,
-                    'patient_id' => $p->paciente_id,
-                    'date_start' => $p->fecha_ciclo_insertada == '' || $p->fecha_ciclo_insertada == null ? now()->format('Y-m-d') : ($this->parseDateInt($p->fecha_ciclo_insertada) ?? now()->format('Y-m-d')),
-                    'date_end' => $p->fecha_expiracion == '' || $p->fecha_expiracion == null ? now()->format('Y-m-d') : ($this->parseDateInt($p->fecha_expiracion) ?? now()->format('Y-m-d')),
-                    'plan_name' => Plan::find($p->plan_id)->name ?? 'Plan '.$this->generateRandomCode(AssignedPlan::class,8,'plan_name'),
-                    'paid_type' => 1,
-                    'amount' => $p->costo,
-                    'therapies_number' => $p->terapias_fisicas,
-                    'number_installments' => Plan::find($p->plan_id)->number_installments ?? 0,
-                    'status' => $p->estado,
-                    'branch_id' => $p->centro_id,
-                    'user_id' => $user->id,
-                    'card_commission' => $p->card_fee,
-                    'bank_commission' => $p->bank_fee,
-                    'other_commission' => $p->other_fee,
-                    'created_at' => $this->parseDateInt($p->fecha_cre),
-                    'updated_at' => $this->parseDateInt($p->fecha_cre),
-                ]);
-
-            /*
-                    $assignedPlan->transactions()->create([
-                        'assigned_plan_id' => $assignedPlan->id,
-                        'patient_id' => $p->paciente_id,
-                        'amount' => $p->consumido,
-                        'transaction_type' => 'entrada',
-                        'description' => 'Plan asignado',
-                    ]);
-                    if ($p->descuento != 0) {
-                        for ($i = 0; $i < $p->descuento; $i++) {
-                            DescuentAuthorization::create([
-                                'patient_id' => $p->paciente_id,
-                                'assigned_plan_id' => $assignedPlan->id,
-                                'type' => 1,
-                                'request_amount' => $p->descuento,
-                                'approved_amount' => $p->descuento,
-                                'status' => 2,
-                                'request_by' => $user->id,
-                                'authorized_by' => $user->id,
-                                'authorized_at' => now(),
-                                'created_at' => $this->parseDateInt($p->fecha_cre),
-                                'updated_at' => $this->parseDateInt($p->fecha_cre),
-                            ]);
-                        }
+                if ($p->estado == 1) {
+                    // Verificar si el paciente existe
+                    if (!Patient::find($p->paciente_id)) {
+                        $this->warn("Paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
+                        continue;
                     }
 
-                    $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
-                    $priceTerapia = $p->terapia_fisica > 0 ? $p->consumido / $p->terapia_fisica : 0;
+                    if (!Planes::find($p->plan_id)) {
+                        $this->warn("Plan no encontrado - ID: {$p->plan_id}. Omitiendo registro.");
+                        continue;
+                    }
+
+
+                    $assignedPlan = AssignedPlan::updateOrCreate(
+                        [
+                            'id' => $p->id,
+                        ],
+                        [
+                            'id' => $p->id,
+                            'plan_id' => $p->plan_id,
+                            'patient_id' => $p->paciente_id,
+                            'date_start' => $p->fecha_ciclo_insertada == '' || $p->fecha_ciclo_insertada == null ? now()->format('Y-m-d') : ($this->parseDateInt($p->fecha_ciclo_insertada) ?? now()->format('Y-m-d')),
+                            'date_end' => $p->fecha_expiracion == '' || $p->fecha_expiracion == null ? now()->format('Y-m-d') : ($this->parseDateInt($p->fecha_expiracion) ?? now()->format('Y-m-d')),
+                            'plan_name' => Plan::find($p->plan_id)->name ?? 'Plan ' . $this->generateRandomCode(AssignedPlan::class, 8, 'plan_name'),
+                            'paid_type' => 1,
+                            'amount' => $p->costo,
+                            'therapies_number' => $p->terapias_fisicas,
+                            'number_installments' => Plan::find($p->plan_id)->number_installments ?? 0,
+                            'status' => $p->estado,
+                            'branch_id' => $p->centro_id,
+                            'user_id' => $user->id,
+                            'card_commission' => $p->card_fee,
+                            'bank_commission' => $p->bank_fee,
+                            'other_commission' => $p->other_fee,
+                            'created_at' => $this->parseDateInt($p->fecha_cre),
+                            'updated_at' => $this->parseDateInt($p->fecha_cre),
+                        ]
+                    );
+
+                }
+                $assignedPlan->transactions()->create([
+                    'assigned_plan_id' => $assignedPlan->id,
+                    'patient_id' => $p->paciente_id,
+                    'amount' => $p->consumido,
+                    'transaction_type' => 'entrada',
+                    'description' => 'Plan asignado',
+                ]);
+                if ($p->descuento != 0) {
+                    for ($i = 0; $i < $p->descuento; $i++) {
+                        DescuentAuthorization::create([
+                            'patient_id' => $p->paciente_id,
+                            'assigned_plan_id' => $assignedPlan->id,
+                            'type' => 1,
+                            'request_amount' => $p->descuento,
+                            'approved_amount' => $p->descuento,
+                            'status' => 2,
+                            'request_by' => $user->id,
+                            'authorized_by' => $user->id,
+                            'authorized_at' => now(),
+                            'created_at' => $this->parseDateInt($p->fecha_cre),
+                            'updated_at' => $this->parseDateInt($p->fecha_cre),
+                        ]);
+                    }
+                }
+
+                $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
+                $priceTerapia = $p->terapia_fisica > 0 ? $p->consumido / $p->terapia_fisica : 0;
 
                 if ($p->sessiones_utilizadas != 0) {
                     for ($i = 0; $i < $p->sessiones_utilizadas; $i++) {
                         AcquiredService::create([
                             'patient_id' => $p->paciente_id,
                             'assigned_plan_id' => $assignedPlan->id,
-                            'plan_item_id' => Item::where('plan', true)->where('type_of_item_id', 7)->first()->id,
+                            'plan_item_id' => Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first()->id,
                             'price' => $priceAjuste,
-                            'status' => 3,
+                            'status' => ServicesStatus::COMPLETADA->value,
                         ]);
                     }
                 }
@@ -107,13 +112,12 @@ class MigratePlanesAsignados extends BaseCommand
                         AcquiredService::create([
                             'patient_id' => $p->paciente_id,
                             'assigned_plan_id' => $assignedPlan->id,
-                            'plan_item_id' => Item::where('plan', true)->where('type_of_item_id', 5)->first()->id,
+                            'plan_item_id' => Item::where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first()->id,
                             'price' => $priceTerapia,
-                            'status' => 3,
+                            'status' => ServicesStatus::COMPLETADA->value,
                         ]);
                     }
                 }
-                */
 
 
             }

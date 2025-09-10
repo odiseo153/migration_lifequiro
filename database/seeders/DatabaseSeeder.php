@@ -47,8 +47,20 @@ class DatabaseSeeder extends Seeder
     {
         $this->command->info('Iniciando la creación de datos iniciales...');
 
+        $types = [
+            ['name' => 'Consulta', 'id' => 1],
+            ['name' => 'Radiografía', 'id' => 2],
+            ['name' => 'Reporte', 'id' => 3],
+            ['name' => 'Comparación', 'id' => 4],
+            ['name' => 'Terapia Física', 'id' => 5],
+            ['name' => 'Tracción', 'id' => 6],
+            ['name' => 'Ajuste', 'id' => 7],
+            ['name' => 'Analisis de Postura', 'id' => 8],
+        ];
+        TypeOfItem::insert($types);
+        $this->command->info('- Tipos de servicios creados con éxito.');
 
-
+        /*
         $statuses = [
             ['state' => 'Completada', 'order' => 4, 'id' => 1],
             ['state' => 'Programada', 'order' => 1, 'id' => 2],
@@ -82,7 +94,6 @@ class DatabaseSeeder extends Seeder
         $this->command->info('- Tipos de citas creados con éxito.');
 
 
-        /*
 
         // Crear Tipos de Planes
         $typesOfPlans = [
@@ -168,18 +179,7 @@ class DatabaseSeeder extends Seeder
                 $this->command->info('- Tipos de citas creados con éxito.');
 
                 // Crear Tipos de Servicios
-                $types = [
-                    ['name' => 'Consulta', 'id' => 1],
-                    ['name' => 'Radiografía', 'id' => 2],
-                    ['name' => 'Reporte', 'id' => 3],
-                    ['name' => 'Comparación', 'id' => 4],
-                    ['name' => 'Terapia Física', 'id' => 5],
-                    ['name' => 'Tracción', 'id' => 6],
-                    ['name' => 'Ajuste', 'id' => 7],
-                    ['name' => 'Analisis de Postura', 'id' => 8],
-                ];
-                TypeOfItem::insert($types);
-                $this->command->info('- Tipos de servicios creados con éxito.');
+
 
 
                 $arsList = [
