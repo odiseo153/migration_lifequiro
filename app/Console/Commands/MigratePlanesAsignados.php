@@ -118,24 +118,9 @@ class MigratePlanesAsignados extends BaseCommand
                     $priceAjuste = $item_price;
                     $priceTerapia = $item_price;
 
-                    if ($p->sessiones_utilizadas != 0) {
+                    if ($p->sesiones_utilizadas != 0) {
                         $itemAjuste = Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first();
-                        Log::info('sessiones_utilizadas: ' ,[
-                            'sessiones_utilizadas' => $p->sessiones_utilizadas,
-                            'terapias_utilizadas' => $p->terapias_utilizadas,
-                        ]);
-                        if (!$itemAjuste) {
-                            $this->warn("Item de AJUSTE con plan=true no encontrado. Creando uno...");
-                            $itemAjuste = Item::create([
-                                'name' => 'Ajuste (Plan)',
-                                'code' => 'AJUSTE_PLAN',
-                                'plan' => true,
-                                'type_of_item_id' => ItemType::AJUSTE->value,
-                                'price' => $priceAjuste,
-                            ]);
-                        }
-
-                        $sessiones = (int) $p->sessiones_utilizadas;
+                        $sessiones = (int) $p->sesiones_utilizadas;
                         for ($i = 0; $i < $sessiones; $i++) {
                             AcquiredService::create([
                                 'patient_id' => $p->paciente_id,
@@ -149,17 +134,6 @@ class MigratePlanesAsignados extends BaseCommand
 
                     if ($p->terapias_utilizadas != 0) {
                         $itemTerapia = Item::where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first();
-
-                        if (!$itemTerapia) {
-                            $this->warn("Item de TERAPIA_FISICA con plan=true no encontrado. Creando uno...");
-                            $itemTerapia = Item::create([
-                                'name' => 'Terapia Física (Plan)',
-                                'code' => 'TERAPIA_PLAN',
-                                'plan' => true,
-                                'type_of_item_id' => ItemType::TERAPIA_FISICA->value,
-                                'price' => $priceTerapia,
-                            ]);
-                        }
 
                         $terapias = (int) $p->terapias_utilizadas;
                         for ($i = 0; $i < $terapias; $i++) {
