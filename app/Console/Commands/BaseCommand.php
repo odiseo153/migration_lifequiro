@@ -31,12 +31,28 @@ class BaseCommand extends Command
     public function parseDateInt($timestamp)
     {
         try {
-            if (empty($timestamp) || !is_numeric($timestamp)) {
-                return null;
+            // Si está vacío o es null, retornar fecha actual
+            if (empty($timestamp) || is_null($timestamp)) {
+                return \Carbon\Carbon::now()->format('Y-m-d H:i:s');
             }
-            return \Carbon\Carbon::createFromTimestamp($timestamp)->format('Y-m-d H:i:s');
+
+            // Si es numérico, tratarlo como timestamp
+            if (is_numeric($timestamp)) {
+                return \Carbon\Carbon::createFromTimestamp($timestamp)->format('Y-m-d H:i:s');
+            }
+
+            // Si es una cadena, intentar parsearlo como fecha
+            if (is_string($timestamp)) {
+                $parsedDate = \Carbon\Carbon::parse($timestamp);
+                return $parsedDate->format('Y-m-d H:i:s');
+            }
+
+            // Si no es ninguno de los casos anteriores, retornar fecha actual
+            return \Carbon\Carbon::now()->format('Y-m-d H:i:s');
+
         } catch (\Exception $e) {
-            return null;
+            // En caso de error, retornar fecha actual
+            return \Carbon\Carbon::now()->format('Y-m-d H:i:s');
         }
     }
 
