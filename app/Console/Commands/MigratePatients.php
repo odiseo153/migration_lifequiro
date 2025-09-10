@@ -145,6 +145,7 @@ class MigratePatients extends BaseCommand
 
             // Inserción batch de pacientes
             if (!empty($patientsToInsert)) {
+                try {
                     Patient::upsert($patientsToInsert, ['id'], [
                         'email',
                         'identity_document',
@@ -164,11 +165,56 @@ class MigratePatients extends BaseCommand
                         'where_met_us_id',
                         'updated_at'
                     ]);
-            }
+                    $this->info("Insertados/actualizados " . count($patientsToInsert) . " pacientes");
 
-            // Inserción batch de citas
-            if (!empty($appointmentsToInsert)) {
-                    Appointment::insert($appointmentsToInsert);
+                    // Solo insertar citas después de que los pacientes se hayan insertado exitosamente
+                    if (!empty($appointmentsToInsert)) {
+                        // Verificar que todos los pacientes de las citas existen
+                        $patientIds = collect($patientsToInsert)->pluck('id')->toArray();
+                        $validAppointments = collect($appointmentsToInsert)->filter(function($appointment) use ($patientIds) {
+                            return in_array($appointment['patient_id'], $patientIds);
+                        })->toArray();
+
+                        if (!empty($validAppointments)) {
+                            Appointment::insert($validAppointments);
+                            $this->info("Insertadas " . count($validAppointments) . " citas");
+                        }
+
+                        $skippedAppointments = count($appointmentsToInsert) - count($validAppointments);
+                        if ($skippedAppointments > 0) {
+                            $this->warn("Se omitieron {$skippedAppointments} citas por pacientes inexistentes");
+                        }
+                    }
+
+                } catch (\Exception $e) {
+                    $this->error("Error en inserción batch de pacientes: " . $e->getMessage());
+                    // Si falla la inserción de pacientes, no insertar citas
+                    $this->warn("Se omitieron " . count($appointmentsToInsert) . " citas debido al error en pacientes");
+                }
+            } else {
+                // Si no hay pacientes para insertar, verificar que las citas tengan pacientes válidos
+                if (!empty($appointmentsToInsert)) {
+                    $patientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
+                    $existingPatients = Patient::whereIn('id', $patientIds)->pluck('id')->toArray();
+
+                    $validAppointments = collect($appointmentsToInsert)->filter(function($appointment) use ($existingPatients) {
+                        return in_array($appointment['patient_id'], $existingPatients);
+                    })->toArray();
+
+                    if (!empty($validAppointments)) {
+                        try {
+                            Appointment::insert($validAppointments);
+                            $this->info("Insertadas " . count($validAppointments) . " citas");
+                        } catch (\Exception $e) {
+                            $this->error("Error en inserción de citas: " . $e->getMessage());
+                        }
+                    }
+
+                    $skippedAppointments = count($appointmentsToInsert) - count($validAppointments);
+                    if ($skippedAppointments > 0) {
+                        $this->warn("Se omitieron {$skippedAppointments} citas por pacientes inexistentes");
+                    }
+                }
             }
         });
 
