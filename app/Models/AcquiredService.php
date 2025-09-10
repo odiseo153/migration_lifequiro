@@ -13,7 +13,8 @@ class AcquiredService extends BaseModel
         'patient_item_id',
         'patient_id',
         'plan_item_id',
-        'assigned_plan_id'
+        'assigned_plan_id',
+        'created_at'
     ];
 
     public function item()
