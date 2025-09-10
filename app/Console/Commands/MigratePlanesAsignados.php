@@ -65,9 +65,8 @@ class MigratePlanesAsignados extends BaseCommand
                         ]
                     );
 
-                }
-                $assignedPlan->transactions()->create([
-                    'assigned_plan_id' => $assignedPlan->id,
+                    $assignedPlan->transactions()->create([
+                        'assigned_plan_id' => $assignedPlan->id,
                     'patient_id' => $p->paciente_id,
                     'amount' => $p->consumido,
                     'transaction_type' => 'entrada',
@@ -119,6 +118,7 @@ class MigratePlanesAsignados extends BaseCommand
                     }
                 }
 
+            }
 
             }
         });
