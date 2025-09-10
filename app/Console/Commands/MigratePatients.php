@@ -1,7 +1,6 @@
 <?php
 namespace App\Console\Commands;
 
-use App\Enums\AppointmentStatus;
 use App\Models\Ars;
 use App\Models\Invoice;
 use App\Models\Patient;
@@ -16,7 +15,9 @@ use App\Enums\TransactionType;
 use App\Models\Legacy\Factura;
 use App\Models\Legacy\Paciente;
 use App\Models\PlanTransaction;
+use App\Enums\AppointmentStatus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class MigratePatients extends BaseCommand
 {
@@ -60,7 +61,9 @@ class MigratePatients extends BaseCommand
             $appointmentsToInsert = [];
 
             foreach ($pacientes as $p) {
+$branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
                 try {
+
                     $where_met_us_id = null;
                     $is_refencia_acceptable = $p->referencia != '--' && $p->referencia != '';
 
@@ -98,7 +101,7 @@ class MigratePatients extends BaseCommand
                         'address' => $p->direccion ?? "",
                         'occupation' => $p->ocupacion ?? "",
                         'comment' => $p->comentario ?? "",
-                        'branch_id' => $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id,
+                        'branch_id' => $branch_id,
                         'patient_group_id' => $patientGroups->has($p->grupo) ? $p->grupo : 1,
                         'where_met_us_id' => $where_met_us_id ?? 1,
                         'created_at' => $p->fecha == null ? now() : $this->parseDateInt($p->fecha),
@@ -124,7 +127,7 @@ class MigratePatients extends BaseCommand
                         $appointmentData = [
                             'note' => 'Cita de migración',
                             'patient_id' => $p->id,
-                            'branch_id' => $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id,
+                            'branch_id' => $branch_id,
                             'type_of_appointment_id' => $TypeAppointment,
                             'status_id' => $last_appointment_old->estado_id,
                             'date' => $this->parseDateInt($last_appointment_old->dia),
@@ -137,7 +140,6 @@ class MigratePatients extends BaseCommand
                     }
 
                 } catch (\Exception $e) {
-                    $this->warn("Error procesando paciente ID: {$p->id} - " . $e->getMessage());
                     continue;
                 }
             }
@@ -163,7 +165,7 @@ class MigratePatients extends BaseCommand
                     Appointment::insert($appointmentsToInsert);
                     $this->info("Insertadas " . count($appointmentsToInsert) . " citas");
                 } catch (\Exception $e) {
-                    $this->error("Error en inserción batch de citas: " . $e->getMessage());
+                    Log::error("Error en inserción batch de citas: " . $e->getMessage());
                 }
             }
         });
