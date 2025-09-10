@@ -90,6 +90,7 @@ class MigratePatients extends BaseCommand
                     5=>AppointmentType::MR->value,
                     6=>AppointmentType::COMPARACION->value,
                     7=>AppointmentType::MR->value,
+                    8=>AppointmentType::MIP->value,
                 ];
 
 
@@ -99,13 +100,13 @@ class MigratePatients extends BaseCommand
 
 if($last_appointment_old){
                 $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $last_appointment_old->hora)->format('H:i:s');
-//$TypeAppointment=$last_appointment_old->tipo > 7 ?  AppointmentType::CONSULTA->value :$CitaTipoOld[$last_appointment_old->tipo];
+               $TypeAppointment=$last_appointment_old->tipo > 8 ?  AppointmentType::MIP->value :$CitaTipoOld[$last_appointment_old->tipo];
 
                 Appointment::create([
                 'note' => 'Cita de migracion',
                 'patient_id' => $p->id,
                 'branch_id' => $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id,
-                'type_of_appointment_id' => $CitaTipoOld[$last_appointment_old->tipo],
+                'type_of_appointment_id' => $TypeAppointment,
                 'status_id' => $last_appointment_old->estado_id,
                 'date' => $this->parseDateInt($last_appointment_old->dia),
                     'hour' => $hourFormatted,
