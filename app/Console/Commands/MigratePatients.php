@@ -92,12 +92,13 @@ class MigratePatients extends BaseCommand
                     7=>AppointmentType::MR->value,
                 ];
 
+
+                $last_appointment_old=Cita::
+                where('estado_id',AppointmentStatus::COMPLETADA->value)
+                ->where('paciente_id',$p->id)->orderBy('fecha','desc')->first();
+
+if($last_appointment_old){
                 $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $last_appointment_old->hora)->format('H:i:s');
-
-        $last_appointment_old=Cita::
-        where('estado_id',AppointmentStatus::COMPLETADA->value)
-        ->where('paciente_id',$p->id)->orderBy('fecha','desc')->first();
-
         Appointment::create([
                 'note' => 'Cita de migracion',
                 'patient_id' => $p->id,
@@ -105,9 +106,10 @@ class MigratePatients extends BaseCommand
                 'type_of_appointment_id' => $CitaTipoOld[$last_appointment_old->tipo],
                 'status_id' => $last_appointment_old->estado_id,
                 'date' => $this->parseDateInt($last_appointment_old->dia),
-                'hour' => $hourFormatted,
-                'created_at' => $last_appointment_old->fecha,
-            ]);
+                    'hour' => $hourFormatted,
+                    'created_at' => $last_appointment_old->fecha,
+                ]);
+            }
 
                     /*
                     $ars = Ars::find($p->grupo);
