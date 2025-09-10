@@ -64,6 +64,7 @@ class MigrateHistorialAjuste extends BaseCommand
                         'quantity' => 1,
                         'price' => $item->price,
                         'total' => $item->price,
+                        'created_at' => $historial->fecha,
                     ]);
 
                     $room = Room::inRandomOrder()->first() ?? Room::factory()->create();
@@ -75,6 +76,7 @@ class MigrateHistorialAjuste extends BaseCommand
                         'room_id' => $room->id,
                         'bed_id' => $bed->id,
                         'user_id' => $user->id,
+                        'created_at' => $historial->fecha,
                     ]);
 
                     $acquiredService = AcquiredService::create([
@@ -82,6 +84,7 @@ class MigrateHistorialAjuste extends BaseCommand
                         'price' => $item->price,
                         'status' => ServicesStatus::COMPLETADA->value,
                         'patient_item_id' => $service->id,
+                        'created_at' => $historial->fecha,
                     ]);
 
 
