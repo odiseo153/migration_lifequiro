@@ -26,7 +26,7 @@ class MigratePlanesAsignados extends BaseCommand
 
         Ajuste::chunk(500, function ($pacientes) {
 
-            $user = User::factory()->create();
+            $user = User::first();
             foreach ($pacientes as $p) {
                 if ($p->estado == 1) {
                     // Verificar si el paciente existe
@@ -41,10 +41,7 @@ class MigratePlanesAsignados extends BaseCommand
                     }
 
 
-                    $assignedPlan = AssignedPlan::updateOrCreate(
-                        [
-                            'id' => $p->id,
-                        ],
+                    $assignedPlan = AssignedPlan::create(
                         [
                             'id' => $p->id,
                             'plan_id' => $p->plan_id,
@@ -93,14 +90,13 @@ class MigratePlanesAsignados extends BaseCommand
                     }
 
                     // Calcular precio por ítem como en la función find()
-                    $total_items = $assignedPlan->plan->total_sessions + $assignedPlan->therapies_number;
+                    $total_items = $assignedPlan->plan->total_sessions;
                     $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
 
                     // Calcular cuántos vouchers necesitamos crear basado en el consumo total
                     $total_consumed_items = (int) $p->sesiones_utilizadas + (int) $p->terapias_utilizadas;
 
                     // Crear vouchers individuales para que el cálculo de consumo sea correcto
-
                     if ($total_consumed_items != 0) {
 
                         for ($i = 0; $i < $total_consumed_items; $i++) {
