@@ -8,8 +8,9 @@ use App\Enums\AppointmentStatus;
 
 class MedicalAjusteModule extends BaseModel
 {
-    
+
     protected $fillable = [
+        'id',
         'patient_id',
         'service_id',
         'acquired_service_id',
@@ -19,6 +20,7 @@ class MedicalAjusteModule extends BaseModel
         'thoracic_vertebrae',
         'lumbar_vertebrae',
         'note',
+        'created_at',
     ];
 
     public function patient()
@@ -53,7 +55,7 @@ class MedicalAjusteModule extends BaseModel
             );
 
         if (
-            $sameAppointment->isEmpty() || 
+            $sameAppointment->isEmpty() ||
             $sameAppointment->every(fn($s) => $s->status == ServicesStatus::COMPLETADA)
             )
             {

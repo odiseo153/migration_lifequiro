@@ -144,7 +144,7 @@ class MigrateHistorialAjuste extends BaseCommand
                             'cervical_vertebrae' => implode(', ', $cervicalVertebrae),
                             'thoracic_vertebrae' => implode(', ', $thoracicVertebrae),
                             'lumbar_vertebrae' => implode(', ', $lumbarVertebrae),
-                            'created_at' => $this->parseDate($historial->fecha),
+                            'created_at' => $historial->fecha,
                         ]
                     );
                 }
