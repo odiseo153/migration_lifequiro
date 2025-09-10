@@ -48,7 +48,7 @@ class MigratePatients extends BaseCommand
             ->where('estado_id', AppointmentStatus::COMPLETADA->value)
             ->whereIn('id', function($query) {
                 $query->select(\DB::raw('MAX(id)'))
-                    ->from('citas')
+                    ->from('cita')
                     ->where('estado_id', AppointmentStatus::COMPLETADA->value)
                     ->groupBy('paciente_id');
             })
