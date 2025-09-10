@@ -15,5 +15,5 @@ Route::get('/user', function (Request $request) {
 
 Route::get('/test', function (Request $request) {
 
-return  \Carbon\Carbon::createFromTimestamp(1480168148)->format('Y-m-d H:i:s');
+return User::inRandomOrder()->first();
     });

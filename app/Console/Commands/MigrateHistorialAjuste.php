@@ -66,9 +66,9 @@ class MigrateHistorialAjuste extends Command
                         'total' => $item->price,
                     ]);
 
-                    $room = Room::first() ?? Room::factory()->create();
-                    $bed = Bed::first() ?? Bed::factory()->create();
-                    $user = User::first() ?? User::factory()->create();
+                    $room = Room::inRandomOrder()->first() ?? Room::factory()->create();
+                    $bed = Bed::inRandomOrder()->first() ?? Bed::factory()->create();
+                    $user = User::inRandomOrder()->first() ?? User::factory()->create();
 
                     $service->waiting_room()->create([
                         'patient_id' => $historial->paciente_id,
@@ -119,11 +119,14 @@ class MigrateHistorialAjuste extends Command
                             'cervical_vertebrae' => implode(', ', $cervicalVertebrae),
                             'thoracic_vertebrae' => implode(', ', $thoracicVertebrae),
                             'lumbar_vertebrae' => implode(', ', $lumbarVertebrae),
-                            'note' => $historial->note,
+                            'created_at' => $this->parseDate($historial->fecha),
                         ]
                     );
                 }
             });
         });
+
+        $this->info("Migración completada de historial ajuste.");
+
     }
 }
