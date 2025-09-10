@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Enums\ItemType;
 use App\Models\Patient;
 use App\Models\Voucher;
+use App\Enums\PlanStatus;
 use App\Enums\ServicesStatus;
 use App\Models\Legacy\Ajuste;
 use App\Models\Legacy\Planes;
@@ -28,7 +29,15 @@ class MigratePlanesAsignados extends BaseCommand
 
             $user = User::first();
             foreach ($pacientes as $p) {
-                if ($p->estado == 1) {
+                if (in_array($p->estado, [1, 2,3])) {
+
+                    $planStatusMatch = [
+                        1 => PlanStatus::Activo->value,
+                        2 => PlanStatus::Expirado->value,
+                        3 => PlanStatus::Completado->value,
+                        4=> PlanStatus::Desactivado->value,
+                    ];
+
                     // Verificar si el paciente existe
                     if (!Patient::find($p->paciente_id)) {
                         $this->warn("Paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
@@ -53,7 +62,7 @@ class MigratePlanesAsignados extends BaseCommand
                             'amount' => $p->costo,
                             'therapies_number' => $p->terapias_fisicas,
                             'number_installments' => Plan::find($p->plan_id)->number_installments ?? 0,
-                            'status' => $p->estado,
+                            'status' => $planStatusMatch[$p->estado],
                             'branch_id' => $p->centro_id,
                             'user_id' => $user->id,
                             'card_commission' => $p->card_fee,
