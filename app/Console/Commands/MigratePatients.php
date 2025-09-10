@@ -89,7 +89,7 @@ class MigratePatients extends BaseCommand
                         'identity_document' => $p->cedula_no == '' ? null : $p->cedula_no,
                         'first_name' => $p->nombre ?? "",
                         'last_name' => $p->apellido ?? "sin apellido",
-                        'birth_date' => $this->parseDate($p->fecha_nacimiento) ? $this->parseDate($p->fecha_nacimiento) : now(),
+                        'birth_date' => $this->parseDate($p->fecha_nacimiento) ,
                         'mobile' => $p->celular ?? "",
                         'phone' => $p->telefono ?? "",
                         'token' => rand(1000, 9999),

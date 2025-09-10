@@ -59,9 +59,16 @@ class BaseCommand extends Command
     public function parseDate($timestamp)
     {
         try {
-            if (empty($timestamp) || !is_numeric($timestamp)) {
+            // Verificar si está vacío, es null, es una cadena vacía o contiene solo espacios
+            if (empty($timestamp) || is_null($timestamp) || trim($timestamp) === '') {
                 return null;
             }
+
+            // Verificar si es un timestamp numérico igual a 0
+            if (is_numeric($timestamp) && $timestamp == 0) {
+                return null;
+            }
+
             return \Carbon\Carbon::parse($timestamp);
         } catch (\Exception $e) {
             return null;
