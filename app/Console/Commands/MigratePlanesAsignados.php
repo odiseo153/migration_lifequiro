@@ -99,7 +99,7 @@ class MigratePlanesAsignados extends BaseCommand
                     $total_consumed_items = (int) $p->sessiones_utilizadas + (int) $p->terapias_utilizadas;
 
                     // Crear vouchers individuales para que el cálculo de consumo sea correcto
-                    if ($total_consumed_items !=0) {
+                    if ($total_consumed_items != 0) {
                         for ($i = 0; $i < $total_consumed_items; $i++) {
                             Voucher::create([
                                 'assigned_plan_id' => $assignedPlan->id,
@@ -107,7 +107,6 @@ class MigratePlanesAsignados extends BaseCommand
                                 'quantity' => 1,
                                 'price' => $item_price,
                                 'created_at' => $this->parseDateInt($p->fecha_cre),
-                                'updated_at' => $this->parseDateInt($p->fecha_cre),
                             ]);
                         }
                     }
