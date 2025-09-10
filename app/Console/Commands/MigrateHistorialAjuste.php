@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\MedicalAjusteModule;
 use App\Models\Legacy\HistorialAjuste;
 
-class MigrateHistorialAjuste extends Command
+class MigrateHistorialAjuste extends BaseCommand
 {
     /**
      * The name and signature of the console command.
