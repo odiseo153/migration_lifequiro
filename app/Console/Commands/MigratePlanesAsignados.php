@@ -91,18 +91,30 @@ class MigratePlanesAsignados extends BaseCommand
                             ]);
                     }
 
-                    Voucher::create([
-                        'assigned_plan_id' => $assignedPlan->id,
-                        'status' => 3,
-                        'quantity' => 1,
-                        'price' => $p->consumido,
-                        'created_at' => $this->parseDateInt($p->fecha_cre),
-                        'updated_at' => $this->parseDateInt($p->fecha_cre),
-                    ]);
+                    // Calcular precio por ítem como en la función find()
+                    $total_items = ($assignedPlan->plan->total_sessions ?? 0) + $assignedPlan->therapies_number;
+                    $item_price = $total_items > 0 ? $assignedPlan->amount / $total_items : 0;
 
+                    // Calcular cuántos vouchers necesitamos crear basado en el consumo total
+                    $total_consumed_items = $p->sessiones_utilizadas + $p->terapias_utilizadas;
 
-                    $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
-                    $priceTerapia = $p->terapia_fisica > 0 ? $p->consumido / $p->terapia_fisica : 0;
+                    // Crear vouchers individuales para que el cálculo de consumo sea correcto
+                    if ($total_consumed_items > 0 && $item_price > 0) {
+                        for ($i = 0; $i < $total_consumed_items; $i++) {
+                            Voucher::create([
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'status' => 3,
+                                'quantity' => 1,
+                                'price' => $item_price,
+                                'created_at' => $this->parseDateInt($p->fecha_cre),
+                                'updated_at' => $this->parseDateInt($p->fecha_cre),
+                            ]);
+                        }
+                    }
+
+                    // Usar el precio por ítem para todos los servicios adquiridos
+                    $priceAjuste = $item_price;
+                    $priceTerapia = $item_price;
 
                     if ($p->sessiones_utilizadas != 0) {
                         for ($i = 0; $i < $p->sessiones_utilizadas; $i++) {
