@@ -12,6 +12,7 @@ use App\Models\Legacy\Ajuste;
 use App\Models\Legacy\Planes;
 use App\Models\{AssignedPlan};
 use App\Models\AcquiredService;
+use Illuminate\Support\Facades\Log;
 use App\Models\DescuentAuthorization;
 
 class MigratePlanesAsignados extends BaseCommand
@@ -100,6 +101,15 @@ class MigratePlanesAsignados extends BaseCommand
 
                     // Crear vouchers individuales para que el cálculo de consumo sea correcto
                     if ($total_consumed_items != 0) {
+                        Log::info('total_consumed_items: ' ,[
+                            'total_consumed_items' => $total_consumed_items,
+                            'sessiones_utilizadas' => $p->sessiones_utilizadas,
+                            'terapias_utilizadas' => $p->terapias_utilizadas,
+                            'item_price' => $item_price,
+                            'assigned_plan_id' => $assignedPlan->id,
+                            'fecha_cre' => $this->parseDateInt($p->fecha_cre),
+                        ]);
+
                         for ($i = 0; $i < $total_consumed_items; $i++) {
                             Voucher::create([
                                 'assigned_plan_id' => $assignedPlan->id,
@@ -117,7 +127,10 @@ class MigratePlanesAsignados extends BaseCommand
 
                     if ($p->sessiones_utilizadas != 0) {
                         $itemAjuste = Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first();
-
+                        Log::info('sessiones_utilizadas: ' ,[
+                            'sessiones_utilizadas' => $p->sessiones_utilizadas,
+                            'terapias_utilizadas' => $p->terapias_utilizadas,
+                        ]);
                         if (!$itemAjuste) {
                             $this->warn("Item de AJUSTE con plan=true no encontrado. Creando uno...");
                             $itemAjuste = Item::create([
