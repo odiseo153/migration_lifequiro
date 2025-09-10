@@ -33,7 +33,7 @@ class MigratePlanesAsignados extends BaseCommand
                         continue;
                     }
 
-                    if (!Planes::find($p->plan_id)) {
+                    if (!Plan::find($p->plan_id)) {
                         $this->warn("Plan no encontrado - ID: {$p->plan_id}. Omitiendo registro.");
                         continue;
                     }
