@@ -69,6 +69,11 @@ class BaseCommand extends Command
                 return now();
             }
 
+            // Verificar si es una fecha en formato dd-mm-yyyy
+            if (is_string($timestamp) && preg_match('/^\d{2}-\d{2}-\d{4}$/', $timestamp)) {
+                return \Carbon\Carbon::createFromFormat('d-m-Y', $timestamp);
+            }
+
             return \Carbon\Carbon::parse($timestamp);
         } catch (\Exception $e) {
             return now();
