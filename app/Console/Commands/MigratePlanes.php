@@ -1,5 +1,5 @@
 <?php
-    namespace App\Console\Commands;
+namespace App\Console\Commands;
 
 use App\Models\{Plan};
 use App\Models\Legacy\Planes;
@@ -15,22 +15,24 @@ class MigratePlanes extends BaseCommand
 
         Planes::chunk(100, function ($pacientes) {
             foreach ($pacientes as $p) {
-                Plan::updateOrCreate([
-                    'id'  => $p->id,
+                $plan = Plan::updateOrCreate([
+                    'id' => $p->id,
                 ], [
-                    'id'  => $p->id,
-                    'name'  => $p->plan,
-                    'code'   => $p->codigo ?? 'GENERATED-'.$this->generateRandomCode(Plan::class,8,'code'),
-                    'price'  => $p->precio,
+                    'id' => $p->id,
+                    'name' => $p->plan,
+                    'code' => $p->codigo ?? 'GENERATED-' . $this->generateRandomCode(Plan::class, 8, 'code'),
+                    'price' => $p->precio,
                     'total_sessions' => $p->total_sessiones_plan,
-                    'type_of_plan_id'       => $p->tipo ==0 ? 1 :$p->tipo ,
-                    'therapies_number'       => $p->total_terapia_fisica,
-                    'number_installments'       => $p->cuotas_pagos,
+                    'type_of_plan_id' => $p->tipo == 0 ? 1 : $p->tipo,
+                    'therapies_number' => $p->total_terapia_fisica,
+                    'number_installments' => $p->cuotas_pagos,
                     'duration' => $p->tiempo,
-                    'available'  => $p->estado,
+                    'available' => $p->estado,
                     'created_at' => $this->parseDateInt($p->fecha),
                     'updated_at' => $this->parseDateInt($p->fecha),
                 ]);
+
+                $plan->branches()->sync($p->centro_id);
             }
         });
 
