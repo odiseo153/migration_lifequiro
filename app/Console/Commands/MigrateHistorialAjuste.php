@@ -60,6 +60,7 @@ class MigrateHistorialAjuste extends Command
                     'item_id' => $item->id,
                     'quantity' => 1,
                     'price' => $item->price,
+                    'total' => $item->price,
                 ]);
 
                 $room = Room::first() ?? Room::factory()->create();
