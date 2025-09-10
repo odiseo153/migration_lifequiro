@@ -6,6 +6,7 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Enums\ItemType;
 use App\Models\Patient;
+use App\Models\Voucher;
 use App\Enums\ServicesStatus;
 use App\Models\Legacy\Ajuste;
 use App\Models\Legacy\Planes;
@@ -64,61 +65,75 @@ class MigratePlanesAsignados extends BaseCommand
                             'updated_at' => $this->parseDateInt($p->fecha_cre),
                         ]
                     );
+//balance=pagado-consumido
 
                     $assignedPlan->transactions()->create([
                         'assigned_plan_id' => $assignedPlan->id,
-                    'patient_id' => $p->paciente_id,
-                    'amount' => $p->consumido,
-                    'transaction_type' => 'entrada',
-                    'description' => 'Plan asignado',
-                ]);
-                if ($p->descuento != 0) {
-                    for ($i = 0; $i < $p->descuento; $i++) {
-                        DescuentAuthorization::create([
-                            'patient_id' => $p->paciente_id,
+                        'patient_id' => $p->paciente_id,
+                        'amount' => $p->pagado,
+                        'transaction_type' => 'entrada',
+                        'description' => 'Plan asignado',
+                    ]);
+
+                    if ($p->descuento != 0) {
+                        for ($i = 0; $i < $p->descuento; $i++) {
+                            DescuentAuthorization::create([
+                                'patient_id' => $p->paciente_id,
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'type' => 1,
+                                'request_amount' => $p->descuento,
+                                'approved_amount' => $p->descuento,
+                                'status' => 2,
+                                'request_by' => $user->id,
+                                'authorized_by' => $user->id,
+                                'authorized_at' => now(),
+                                'created_at' => $this->parseDateInt($p->fecha_cre),
+                                'updated_at' => $this->parseDateInt($p->fecha_cre),
+                            ]);
+                        }
+                    }
+
+                    $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
+                    $priceTerapia = $p->terapia_fisica > 0 ? $p->consumido / $p->terapia_fisica : 0;
+
+                    if ($p->consumido != 0) {
+                        Voucher::create([
                             'assigned_plan_id' => $assignedPlan->id,
-                            'type' => 1,
-                            'request_amount' => $p->descuento,
-                            'approved_amount' => $p->descuento,
-                            'status' => 2,
-                            'request_by' => $user->id,
-                            'authorized_by' => $user->id,
-                            'authorized_at' => now(),
+                            'status' => 3,
+                            'quantity' => 1,
+                            'price' => $p->consumido,
                             'created_at' => $this->parseDateInt($p->fecha_cre),
                             'updated_at' => $this->parseDateInt($p->fecha_cre),
                         ]);
                     }
-                }
 
-                $priceAjuste = $p->sessiones_utilizadas > 0 ? $p->consumido / $p->sessiones_utilizadas : 0;
-                $priceTerapia = $p->terapia_fisica > 0 ? $p->consumido / $p->terapia_fisica : 0;
 
-                if ($p->sessiones_utilizadas != 0) {
-                    for ($i = 0; $i < $p->sessiones_utilizadas; $i++) {
-                        AcquiredService::create([
-                            'patient_id' => $p->paciente_id,
-                            'assigned_plan_id' => $assignedPlan->id,
-                            'plan_item_id' => Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first()->id,
-                            'price' => $priceAjuste,
-                            'status' => ServicesStatus::COMPLETADA->value,
-                        ]);
+                    if ($p->sessiones_utilizadas != 0) {
+                        for ($i = 0; $i < $p->sessiones_utilizadas; $i++) {
+                            AcquiredService::create([
+                                'patient_id' => $p->paciente_id,
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'plan_item_id' => Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first()->id,
+                                'price' => $priceAjuste,
+                                'status' => ServicesStatus::COMPLETADA->value,
+                            ]);
+                        }
                     }
-                }
 
 
-                if ($p->terapias_utilizadas != 0) {
-                    for ($i = 0; $i < $p->terapias_utilizadas; $i++) {
-                        AcquiredService::create([
-                            'patient_id' => $p->paciente_id,
-                            'assigned_plan_id' => $assignedPlan->id,
-                            'plan_item_id' => Item::where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first()->id,
-                            'price' => $priceTerapia,
-                            'status' => ServicesStatus::COMPLETADA->value,
-                        ]);
+                    if ($p->terapias_utilizadas != 0) {
+                        for ($i = 0; $i < $p->terapias_utilizadas; $i++) {
+                            AcquiredService::create([
+                                'patient_id' => $p->paciente_id,
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'plan_item_id' => Item::where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first()->id,
+                                'price' => $priceTerapia,
+                                'status' => ServicesStatus::COMPLETADA->value,
+                            ]);
+                        }
                     }
-                }
 
-            }
+                }
 
             }
         });
