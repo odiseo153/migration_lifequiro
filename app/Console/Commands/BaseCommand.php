@@ -61,17 +61,17 @@ class BaseCommand extends Command
         try {
             // Verificar si está vacío, es null, es una cadena vacía o contiene solo espacios
             if (empty($timestamp) || is_null($timestamp) || trim($timestamp) === '') {
-                return null;
+                return now();
             }
 
             // Verificar si es un timestamp numérico igual a 0
             if (is_numeric($timestamp) && $timestamp == 0) {
-                return null;
+                return now();
             }
 
             return \Carbon\Carbon::parse($timestamp);
         } catch (\Exception $e) {
-            return null;
+            return now();
         }
     }
 
