@@ -36,9 +36,14 @@ class BaseCommand extends Command
                 return \Carbon\Carbon::now()->format('Y-m-d H:i:s');
             }
 
-            // Si es numérico, tratarlo como timestamp
+            // Si es numérico (número o cadena numérica), tratarlo como timestamp
             if (is_numeric($timestamp)) {
                 return \Carbon\Carbon::createFromTimestamp($timestamp)->format('Y-m-d H:i:s');
+            }
+
+            // Si es una cadena que contiene solo números (números en texto), tratarlo como timestamp
+            if (is_string($timestamp) && ctype_digit(trim($timestamp))) {
+                return \Carbon\Carbon::createFromTimestamp((int)$timestamp)->format('Y-m-d H:i:s');
             }
 
             // Si es una cadena, intentar parsearlo como fecha
