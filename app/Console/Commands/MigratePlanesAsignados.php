@@ -97,18 +97,11 @@ class MigratePlanesAsignados extends BaseCommand
                     $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
 
                     // Calcular cuántos vouchers necesitamos crear basado en el consumo total
-                    $total_consumed_items = (int) $p->sessiones_utilizadas + (int) $p->terapias_utilizadas;
+                    $total_consumed_items = (int) $p->sesiones_utilizadas + (int) $p->terapias_utilizadas;
 
                     // Crear vouchers individuales para que el cálculo de consumo sea correcto
+
                     if ($total_consumed_items != 0) {
-                        Log::info('total_consumed_items: ' ,[
-                            'total_consumed_items' => $total_consumed_items,
-                            'sessiones_utilizadas' => $p->sessiones_utilizadas,
-                            'terapias_utilizadas' => $p->terapias_utilizadas,
-                            'item_price' => $item_price,
-                            'assigned_plan_id' => $assignedPlan->id,
-                            'fecha_cre' => $this->parseDateInt($p->fecha_cre),
-                        ]);
 
                         for ($i = 0; $i < $total_consumed_items; $i++) {
                             Voucher::create([
