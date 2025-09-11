@@ -1,20 +1,13 @@
 <?php
 namespace App\Console\Commands;
 
-use App\Models\Ars;
-use App\Models\Invoice;
 use App\Models\Patient;
-use App\Enums\PlanStatus;
 use App\Models\Appointment;
 use App\Models\Legacy\Cita;
-use App\Models\AssignedPlan;
 use App\Models\PatientGroup;
 use App\Models\WhereHeMetUs;
 use App\Enums\AppointmentType;
-use App\Enums\TransactionType;
-use App\Models\Legacy\Factura;
 use App\Models\Legacy\Paciente;
-use App\Models\PlanTransaction;
 use App\Enums\AppointmentStatus;
 use Illuminate\Support\Facades\DB;
 

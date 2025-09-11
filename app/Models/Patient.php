@@ -30,6 +30,7 @@ class Patient extends AuthenticablePatient
         'sector_id',
         'branch_id',
         'where_met_us_id',
+        'created_at',
         'patient_group_id'
     ];
 

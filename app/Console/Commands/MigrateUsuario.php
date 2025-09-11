@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\User;
 use App\Models\Position;
 use App\Models\Legacy\Usuario;
+use Illuminate\Support\Facades\Hash;
 
 class MigrateUsuario extends BaseCommand
 {
@@ -34,17 +35,18 @@ class MigrateUsuario extends BaseCommand
                 User::updateOrCreate([
                     'id' => $u->id,
                 ], [
+                    'id'  => $u->id,
                     'first_name'  => mb_convert_encoding($u->nombre, 'UTF-8', 'auto'),
                     'last_name'  => mb_convert_encoding($u->apellido, 'UTF-8', 'auto'),
                     'email' => $this->randomEmail($u->nombre),
                     'username' => $this->randomUsername($u->nombre),
-                    'password' => $u->pass,
-                    'position_id' => $u->puesto == 0 ? 1 : $u->puesto,
+                    'password' => Hash::make('12345678'),
+                    'position_id' => Position::find($u->puesto)?->id ?? 1,
                 ]);
             }
         });
 
-        $this->info("Migración completada.");
+        $this->info("Migración completada de usuarios completa.");
     }
 
     public function randomEmail($nombre)

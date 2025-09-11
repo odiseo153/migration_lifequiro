@@ -37,7 +37,6 @@ class MigrateHistorialLlamadas extends BaseCommand
         Cita::where('nota_cita', '!=', '')
             ->whereIn('estado_id', [AppointmentStatus::POSPUESTA->value, AppointmentStatus::NO_ASISTIO->value, AppointmentStatus::REPROGRAMADA->value, AppointmentStatus::DESACTIVADA->value])
             ->chunk(500, function ($llamadas) {
-                $user = User::inRandomOrder()->first();
                 foreach ($llamadas as $llamada) {
                     $patient = Patient::find($llamada->paciente_id);
                     if (!$patient) {
@@ -50,6 +49,13 @@ class MigrateHistorialLlamadas extends BaseCommand
                         $this->warn("Cita no encontrada - ID: {$llamada->cita_id}. Omitiendo registro.");
                         continue;
                     }
+
+                    $user = User::find($llamada->usuario_id);
+                    if (!$user) {
+                        $this->warn("Usuario no encontrado. Omitiendo registro.");
+                        continue;
+                    }
+
 
                     CallHistory::create([
                         'appointment_id' => $appointment->id,
