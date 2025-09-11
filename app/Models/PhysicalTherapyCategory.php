@@ -5,6 +5,7 @@ namespace App\Models;
 
 class PhysicalTherapyCategory extends BaseModel
 {
+
     protected $fillable = ['name', 'description', 'father_id','type'];
 
     public function father()
