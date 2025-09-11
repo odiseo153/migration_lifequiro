@@ -168,7 +168,9 @@ class MigrateHistorialTerapiaFisicas extends BaseCommand
                     );
 
                     foreach ($categories as $category) {
-                        $medicalTerapiaTracionModule->physical_therapy_category()->attach($itemsMatchTerapiaFisica[$category]);
+                        if (isset($itemsMatchTerapiaFisica[$category])) {
+                            $medicalTerapiaTracionModule->physical_therapy_category()->attach($itemsMatchTerapiaFisica[$category]);
+                        }
                     }
 
                 }
