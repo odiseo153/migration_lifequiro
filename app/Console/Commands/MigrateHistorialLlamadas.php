@@ -54,6 +54,7 @@ class MigrateHistorialLlamadas extends BaseCommand
                     CallHistory::create([
                         'appointment_id' => $appointment->id,
                         'user_id' => $user->id,
+                        'note' => $llamada->nota_cita,
                         'old_status' => $llamada->estado_id,
                         'new_status' => $appointment->status_id,
                     ]);
