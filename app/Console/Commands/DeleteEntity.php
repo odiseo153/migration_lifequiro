@@ -26,6 +26,18 @@ class DeleteEntity extends Command
      */
     public function handle()
     {
-MedicalTerapiaTracionModule::all()->delete();
+MedicalTerapiaTracionModule::all()->each(function ($module) {
+    // Delete all relationships
+    $module->physical_therapy_category()->detach();
+    $module->acquired_service()->delete();
+    $module->service()->delete();
+
+    // Delete the module itself
+    $module->delete();
+
+    $this->info("Deleted module ID: {$module->id}");
+});
+
+$this->info('All MedicalTerapiaTracionModule records and their relationships have been deleted.');
     }
 }
