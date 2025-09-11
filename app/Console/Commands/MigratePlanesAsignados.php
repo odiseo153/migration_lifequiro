@@ -10,10 +10,8 @@ use App\Models\Voucher;
 use App\Enums\PlanStatus;
 use App\Enums\ServicesStatus;
 use App\Models\Legacy\Ajuste;
-use App\Models\Legacy\Planes;
 use App\Models\{AssignedPlan};
 use App\Models\AcquiredService;
-use Illuminate\Support\Facades\Log;
 use App\Models\DescuentAuthorization;
 
 class MigratePlanesAsignados extends BaseCommand

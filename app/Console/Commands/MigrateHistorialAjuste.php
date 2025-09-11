@@ -61,7 +61,7 @@ class MigrateHistorialAjuste extends BaseCommand
                         'id' => $historial->service_id,
                         'patient_id' => $historial->paciente_id,
                         'item_id' => $item->id,
-                        'quantity' => 1,
+                        'quantity' => 0,
                         'price' => $item->price,
                         'total' => $item->price,
                         'created_at' => $historial->fecha,

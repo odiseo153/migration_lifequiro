@@ -30,8 +30,11 @@ class MigrateAll extends Command
     public function handle()
     {
         //
-        $this->call('migrate:centros');
         $this->call('migrate:patients');
+        $this->call('migrate:planes-asignados');
+        $this->call('migrate:historial-llamadas');
+        $this->call('migrate:historial-ajuste');
+        $this->call('migrate:historial-terapia-fisica');
         //$this->call('migrate:planes');
         //$this->call('migrate:planes-asignados');
     }
