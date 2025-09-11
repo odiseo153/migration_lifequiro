@@ -29,9 +29,13 @@ class MigrateAll extends Command
         //
 $this->info("Iniciando migración de todos los datos...");
         $this->call('migrate:patients');
+        $this->info("Iniciando migración de planes...");
         $this->call('migrate:planes-asignados');
+        $this->info("Iniciando migración de historial llamadas...");
         $this->call('migrate:historial-llamadas');
+        $this->info("Iniciando migración de historial ajuste...");
         $this->call('migrate:historial-ajuste');
+        $this->info("Iniciando migration de historial terapia fisica...");
         $this->call('migrate:historial-terapia-fisica');
         //$this->call('migrate:planes');
         //$this->call('migrate:planes-asignados');
