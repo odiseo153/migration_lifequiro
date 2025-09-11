@@ -79,7 +79,7 @@ class MigrateHistorialAjuste extends BaseCommand
                         'created_at' => $historial->fecha,
                     ]);
 
-                    $acquiredService = AcquiredService::create([
+                        $acquiredService = AcquiredService::create([
                         'patient_id' => $historial->paciente_id,
                         'price' => $item->price,
                         'status' => ServicesStatus::COMPLETADA->value,
