@@ -32,11 +32,19 @@ class MigrateAntecedentes extends BaseCommand
         $this->info("Iniciando migración de De antecedentes...");
 
         AntecedenteZonasDolor::chunk(100, function ($centros) {
-            foreach ($centros as $centro) {
+            // Agrupar por paciente_id
+            $centrosByPatient = $centros->groupBy('paciente_id');
 
-                $patient = Patient::find($centro->paciente_id);
+            foreach ($centrosByPatient as $pacienteId => $centrosDelPaciente) {
+                $patient = Patient::find($pacienteId);
                 if (!$patient) {
-                    $this->warn("Paciente no encontrado - ID: {$centro->paciente_id}. Omitiendo registro.");
+                    $this->warn("Paciente no encontrado - ID: {$pacienteId}. Omitiendo registro.");
+                    continue;
+                }
+
+                // Verificar si ya existe un registro médico para este paciente
+                if (MedicalRecord::where('patient_id', $patient->id)->exists()) {
+                    $this->warn("Paciente ya tiene registro médico - ID: {$pacienteId}. Omitiendo registro.");
                     continue;
                 }
 
@@ -45,17 +53,18 @@ class MigrateAntecedentes extends BaseCommand
                     2 => "rojo",
                 ];
 
-                MedicalRecord::updateOrCreate([
-                    'patient_id' => $patient->id,
-                    'id' => $centro->id,
-                ], [
-                    'id' => $centro->id,
-                    'patient_id' => $patient->id,
-                    'pain_areas' => json_encode([
+                $painAreas = [];
+                foreach ($centrosDelPaciente as $centro) {
+                    $painAreas[] = [
                         'type' => $tipoMap[$centro->type],
                         'x' => (int) $centro->leftpos,
                         'y' => (int) $centro->toppos,
-                    ]),
+                    ];
+                }
+
+                MedicalRecord::create([
+                    'patient_id' => $patient->id,
+                    'pain_areas' => json_encode($painAreas),
                     'consultation_reason' => "",
                     'medical_history' => "",
                     'symptoms_impact_on_life' => "",
