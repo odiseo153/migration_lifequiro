@@ -31,44 +31,28 @@ class MigrateAntecedentes extends BaseCommand
     {
         $this->info("Iniciando migración de De antecedentes...");
 
-        AntecedenteZonasDolor::chunk(100, function ($centros) {
-            // Agrupar por paciente_id
-            $centrosByPatient = $centros->groupBy('paciente_id');
+        Antecedente::chunk(100, function ($antecedentes) {
 
-            foreach ($centrosByPatient as $pacienteId => $centrosDelPaciente) {
-                $patient = Patient::find($pacienteId);
+            foreach ($antecedentes as $antecedente) {
+                $patient = Patient::find($antecedente->paciente_id);
                 if (!$patient) {
-                    $this->warn("Paciente no encontrado - ID: {$pacienteId}. Omitiendo registro.");
+                    $this->warn("Paciente no encontrado - ID: {$antecedente->paciente_id}. Omitiendo registro.");
                     continue;
                 }
 
                 // Verificar si ya existe un registro médico para este paciente
                 if (MedicalRecord::where('patient_id', $patient->id)->exists()) {
-                    $this->warn("Paciente ya tiene registro médico - ID: {$pacienteId}. Omitiendo registro.");
+                    $this->warn("Paciente ya tiene registro médico - ID: {$antecedente->paciente_id}. Omitiendo registro.");
                     continue;
-                }
-
-                $tipoMap = [
-                    1 => "verde",
-                    2 => "rojo",
-                ];
-
-                $painAreas = [];
-                foreach ($centrosDelPaciente as $centro) {
-                    $painAreas[] = [
-                        'type' => $tipoMap[$centro->type],
-                        'x' => (int) $centro->leftpos,
-                        'y' => (int) $centro->toppos,
-                    ];
                 }
 
                 MedicalRecord::create([
                     'patient_id' => $patient->id,
-                    'pain_areas' => json_encode($painAreas),
-                    'consultation_reason' => "",
-                    'medical_history' => "",
-                    'symptoms_impact_on_life' => "",
-                    'current_medication' => "",
+                    'id' => $antecedente->id,
+                    'consultation_reason' => $antecedente->motivo_consulta,
+                    'medical_history' => $antecedente->motivos_visita_medico,
+                    'symptoms_impact_on_life' => $antecedente->dano_sintomas,
+                    'current_medication' => $antecedente->medicamentos,
                 ]);
             }
         });
