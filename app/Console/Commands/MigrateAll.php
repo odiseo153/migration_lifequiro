@@ -39,8 +39,6 @@ class MigrateAll extends Command
         $this->call('migrate:antecedentes');
         $this->call('migrate:balance');
         $this->call('migrate:compras');
-        //$this->call('migrate:planes');
-        //$this->call('migrate:planes-asignados');
         $this->info("Migración de todos los datos completada.");
     }
 }
