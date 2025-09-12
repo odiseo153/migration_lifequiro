@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-use App\Enums\ArsServiceStatus;
 
 
 class PatientItem extends BaseModel
 {
     protected $fillable = [
+        'id',
         'item_id',
         'ars_id',
         'patient_id',
@@ -20,6 +20,8 @@ class PatientItem extends BaseModel
         'quantity',
         'no_document',
         'total',
+        'description',
+        'created_at',
 
         //Ars fields
         'no_authorization',
@@ -30,12 +32,6 @@ class PatientItem extends BaseModel
         'ars_paid_amount',
     ];
 
-    protected $casts = [
-        'is_completed' => 'boolean',
-        'status' => 'integer',
-        'is_approved' => 'boolean',
-        'ars_state' => ArsServiceStatus::class,
-    ];
 
     public function waiting_room()
     {
@@ -47,7 +43,7 @@ class PatientItem extends BaseModel
         return $this->belongsToMany(Voucher::class,'voucher_patient_item');
     }
 
-   
+
     public function item()
     {
         return $this->belongsTo(Item::class)->withTrashed();
@@ -84,7 +80,7 @@ class PatientItem extends BaseModel
     {
         return $this->hasOne(ServicesInvoiceArs::class,'service_id','id');
     }
-    
+
     public function patient()
     {
         return $this->belongsTo(Patient::class)->withTrashed();
@@ -130,7 +126,7 @@ class PatientItem extends BaseModel
         return $this->hasMany(PatientRadiologyImage::class, 'patient_item_id');
     }
 
-   
+
 
 }
 
