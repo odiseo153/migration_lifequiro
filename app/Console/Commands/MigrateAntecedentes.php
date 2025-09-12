@@ -53,8 +53,8 @@ class MigrateAntecedentes extends BaseCommand
                     'patient_id' => $patient->id,
                     'pain_areas' => json_encode([
                         'type' => $tipoMap[$centro->type],
-                        'x' => $centro->leftpos,
-                        'y' => $centro->toppos,
+                        'x' => (int) $centro->leftpos,
+                        'y' => (int) $centro->toppos,
                     ]),
                     'consultation_reason' => "",
                     'medical_history' => "",
