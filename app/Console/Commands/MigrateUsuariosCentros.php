@@ -1,6 +1,8 @@
 <?php
 namespace App\Console\Commands;
 
+use App\Models\User;
+use App\Models\Branch;
 use App\Models\BranchUser;
 use App\Models\Legacy\UsuariosCentro;
 
@@ -13,12 +15,28 @@ class MigrateUsuariosCentros extends BaseCommand
     {
         $this->info("Iniciando migración de usuarios centros...");
 
-        UsuariosCentro::limit(2)->chunk(500, function ($pacientes) {
+        UsuariosCentro::chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
-                BranchUser::create([
+                $user = User::find($p->usuario_id);
+
+                if (!$user) {
+                    $this->warn("Usuario no encontrado - ID: {$p->usuario_id}. Omitiendo registro.");
+                    continue;
+                }
+
+                $branch = Branch::find($p->centro_id);
+
+                if (!$branch) {
+                    $this->warn("Centro no encontrado - ID: {$p->centro_id}. Omitiendo registro.");
+                    continue;
+                }
+
+                BranchUser::updateOrCreate([
                     'id' => $p->id,
-                    'user_id' => $p->usuario_id,
-                    'branch_id' => $p->centro_id,
+                ], [
+                    'id' => $p->id,
+                    'user_id' => $user->id,
+                    'branch_id' => $branch->id,
                 ]);
 
             }

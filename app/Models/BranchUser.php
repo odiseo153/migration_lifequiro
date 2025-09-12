@@ -6,7 +6,7 @@ namespace App\Models;
 class BranchUser extends BaseModel
 {
     protected $table = 'branch_user';
-        protected $fillable = ['user_id', 'branch_id'];
+        protected $fillable = ['id','user_id', 'branch_id'];
 
     public function user()
     {
