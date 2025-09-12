@@ -2,9 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 
-class BranchUser extends Model
+class BranchUser extends BaseModel
 {
     protected $table = 'branch_user';
         protected $fillable = ['branch_user_id','user_id', 'branch_id'];
