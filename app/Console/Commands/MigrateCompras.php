@@ -56,10 +56,10 @@ class MigrateCompras extends BaseCommand
                             continue;
                         }
 
-                        $item = Item::where('type_of_item_id', $comprasTipo[$p->tipo])->first();
+                        $item = Item::where('type_of_item_id', $comprasTipo[$p->tipo_servicio])->first();
                         if (!$item) {
                             $item = Item::factory()->create([
-                                'type_of_item_id' => $comprasTipo[$p->tipo],
+                                'type_of_item_id' => $comprasTipo[$p->tipo_servicio],
                             ]);
                         }
 
