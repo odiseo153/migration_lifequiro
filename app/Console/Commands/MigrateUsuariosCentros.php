@@ -32,9 +32,9 @@ class MigrateUsuariosCentros extends BaseCommand
                 }
 
                 BranchUser::updateOrCreate([
-                    'id' => $p->id,
+                    'branch_user_id' => $p->id,
                 ], [
-                    'id' => $p->id,
+                    'branch_user_id' => $p->id,
                     'user_id' => $user->id,
                     'branch_id' => $branch->id,
                 ]);
