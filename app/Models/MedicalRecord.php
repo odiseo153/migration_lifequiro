@@ -6,6 +6,7 @@ class MedicalRecord extends BaseModel
 {
     protected $fillable = [
         'patient_id',
+        'id',
         'has_chronic_disease',
         'chronic_disease_details',
         'has_allergies',
