@@ -26,7 +26,9 @@ class MigratePlanesAsignados extends BaseCommand
     {
         $this->info("Iniciando migración de planes asignados...");
 
-        Ajuste::chunk(500, function ($pacientes) {
+        Ajuste::
+        whereNotIn('plan_id', $this->ignored_plan)
+        ->chunk(500, function ($pacientes) {
             $user = User::first();
             foreach ($pacientes as $p) {
                 if (in_array($p->estado, [1, 2, 3])) {
