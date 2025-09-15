@@ -164,18 +164,11 @@ class MigrateMIPPatients extends BaseCommand
                             }
                         }
 
-                        // Calcular la próxima fecha para el día de la semana en inglés
+                        // Calcular la fecha anterior para el día de la semana en inglés (nunca hoy)
                         $dayOfWeek = $schedule->day; // Ejemplo: 'Monday', 'Tuesday', etc.
                         $today = now();
-                        $appointmentDate = $today->copy();
-
-                        // Si hoy es el día, usar hoy, si no, buscar el anterior
-                        if (strtolower($today->format('l')) === strtolower($dayOfWeek)) {
-                            $appointmentDate = $today;
-                        } else {
-                            // Buscar el día anterior de la semana
-                            $appointmentDate = $today->previous($dayOfWeek);
-                        }
+                        // Buscar siempre el día anterior de la semana, aunque hoy sea ese día
+                        $appointmentDate = $today->previous($dayOfWeek);
 
                         Appointment::create([
                             'note' => 'Cita de migracion MIP para pacientes de planes excluidos',
