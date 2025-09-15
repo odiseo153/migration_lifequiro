@@ -169,12 +169,12 @@ class MigrateMIPPatients extends BaseCommand
                         $today = now();
                         $appointmentDate = $today->copy();
 
-                        // Si hoy es el día, usar hoy, si no, buscar el próximo
+                        // Si hoy es el día, usar hoy, si no, buscar el anterior
                         if (strtolower($today->format('l')) === strtolower($dayOfWeek)) {
                             $appointmentDate = $today;
                         } else {
-                            // Buscar el próximo día de la semana
-                            $appointmentDate = $today->next($dayOfWeek);
+                            // Buscar el día anterior de la semana
+                            $appointmentDate = $today->previous($dayOfWeek);
                         }
 
                         Appointment::create([
