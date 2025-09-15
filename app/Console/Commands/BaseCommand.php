@@ -131,6 +131,11 @@ class BaseCommand extends Command
 
             $branch_id = $legacyPaciente->centro_id == 0 || $legacyPaciente->centro_id == null ? 1 : $legacyPaciente->centro_id;
 
+$document_exists = Patient::where('identity_document', $legacyPaciente->cedula_no)->exists();
+
+            if ($document_exists) {
+                return null;
+            }
 
             $patient = Patient::create([
                 'id' => $paciente_id,
