@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class MigrateMIPPatients extends BaseCommand
 {
-    protected $signature = 'migrate:mip-patients';
+    protected $signature = 'migrate:mip';
     protected $description = 'Migrar datos desde mip (legacy) hacia mip (nuevo)';
     protected $plans = [
         461,
@@ -126,7 +126,7 @@ class MigrateMIPPatients extends BaseCommand
         $this->info("Iniciando migración de pacientes mip...");
         $count = 0;
 
-        DB::transaction(function () {
+        DB::transaction(function () use (&$count) {
             Ajuste::whereIn('plan_id', $this->plans)
                 ->chunk(500, function ($ajustes) use (&$count) {
                     foreach ($ajustes as $ajuste) {
@@ -139,7 +139,6 @@ class MigrateMIPPatients extends BaseCommand
 
                         if ($patient->appointments()->where('type_of_appointment_id', AppointmentType::MIP->value)->exists()) {
                             $count++;
-
                             continue;
                         }
 
@@ -155,12 +154,25 @@ class MigrateMIPPatients extends BaseCommand
                                 $schedule = $anySchedule;
                             } else {
                                 $branch->schedules()->create([
-                                    'day' => now()->dayOfWeek,
+                                    'day' => now()->format('l'), // Día de la semana en inglés (Monday, Tuesday, etc.)
                                     'hour' => now()->format('H:i:s'),
                                     'available' => true,
                                 ]);
                                 $schedule = $branch?->schedules()->where('available', true)->select('day', 'hour')->first();
                             }
+                        }
+
+                        // Calcular la próxima fecha para el día de la semana en inglés
+                        $dayOfWeek = $schedule->day; // Ejemplo: 'Monday', 'Tuesday', etc.
+                        $today = now();
+                        $appointmentDate = $today->copy();
+
+                        // Si hoy es el día, usar hoy, si no, buscar el próximo
+                        if (strtolower($today->format('l')) === strtolower($dayOfWeek)) {
+                            $appointmentDate = $today;
+                        } else {
+                            // Buscar el próximo día de la semana
+                            $appointmentDate = $today->next($dayOfWeek);
                         }
 
                         Appointment::create([
@@ -169,12 +181,13 @@ class MigrateMIPPatients extends BaseCommand
                             'branch_id' => $patient->branch_id,
                             'type_of_appointment_id' => AppointmentType::MIP->value,
                             'status_id' => AppointmentStatus::COMPLETADA->value,
-                            'date' => now()->next($schedule->day)->format('Y-m-d'),
+                            'date' => $appointmentDate->format('Y-m-d'),
                             'hour' => $schedule->hour,
                         ]);
                     }
                 });
         });
+    }
 
         $this->info("Migración de pacientes mip completada. Se crearon saltaron {$count} citas.");
     }
