@@ -178,7 +178,7 @@ class MigrateMIPPatients extends BaseCommand
                         }
 
                         Appointment::create([
-                            'note' => 'Cita de migración MIP para pacientes de planes excluidos',
+                            'note' => 'Cita de migracion MIP para pacientes de planes excluidos',
                             'patient_id' => $patient->id,
                             'branch_id' => $patient->branch_id,
                             'type_of_appointment_id' => AppointmentType::MIP->value,
