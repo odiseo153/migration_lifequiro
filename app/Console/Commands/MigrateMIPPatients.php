@@ -124,6 +124,7 @@ class MigrateMIPPatients extends BaseCommand
     public function handle()
     {
         $this->info("Iniciando migración de pacientes mip...");
+$count=0;
 
         DB::transaction(function () {
             Ajuste::whereIn('plan_id', $this->plans)
@@ -132,6 +133,7 @@ class MigrateMIPPatients extends BaseCommand
                         $patient = Patient::find($ajuste->paciente_id);
                         if (!$patient) {
                             $this->warn("Paciente no encontrado - ID: {$ajuste->paciente_id}. Omitiendo registro.");
+$count++;
                             continue;
                         }
 
@@ -172,6 +174,6 @@ class MigrateMIPPatients extends BaseCommand
                 });
         });
 
-        $this->info("Migración de pacientes mip completada.");
+        $this->info("Migración de pacientes mip completada. Se crearon saltaron {$count} citas.");
     }
 }
