@@ -131,9 +131,13 @@ class MigrateMIPPatients extends BaseCommand
                 ->chunk(500, function ($ajustes) use (&$count) {
                     foreach ($ajustes as $ajuste) {
                         $patient = Patient::find($ajuste->paciente_id);
+
                         if (!$patient) {
-                            $this->warn("Paciente no encontrado - ID: {$ajuste->paciente_id}. Omitiendo registro.");
-                            continue;
+                            $patient = $this->createPatientIfDoesntExist($ajuste->paciente_id);
+                            if (!$patient) {
+                                $this->warn("Paciente no encontrado - ID: {$ajuste->paciente_id}. Omitiendo registro.");
+                                continue;
+                            }
                         }
 
                         if ($patient->appointments()->where('type_of_appointment_id', AppointmentType::MIP->value)->exists()) {
