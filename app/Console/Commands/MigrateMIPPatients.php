@@ -133,12 +133,10 @@ class MigrateMIPPatients extends BaseCommand
                         $patient = Patient::find($ajuste->paciente_id);
                         if (!$patient) {
                             $this->warn("Paciente no encontrado - ID: {$ajuste->paciente_id}. Omitiendo registro.");
-                            $count++;
                             continue;
                         }
 
                         if ($patient->appointments()->where('type_of_appointment_id', AppointmentType::MIP->value)->exists()) {
-                            $count++;
                             continue;
                         }
 
@@ -155,7 +153,7 @@ class MigrateMIPPatients extends BaseCommand
                             } else {
                                 $branch->schedules()->create([
                                     'day' => now()->format('l'), // Día de la semana en inglés (Monday, Tuesday, etc.)
-                                    'hour' => now()->format('H:i:s'),
+                                    'hour' => '10:00:00',
                                     'available' => true,
                                 ]);
                                 $schedule = $branch?->schedules()->where('available', true)->select('day', 'hour')->first();
@@ -181,13 +179,15 @@ class MigrateMIPPatients extends BaseCommand
                             'branch_id' => $patient->branch_id,
                             'type_of_appointment_id' => AppointmentType::MIP->value,
                             'status_id' => AppointmentStatus::COMPLETADA->value,
-                            'date' => $appointmentDate->format('Y-m-d'),
+                            'date' => $appointmentDate,
                             'hour' => $schedule->hour,
                         ]);
+
+                        $count++;
                     }
                 });
         });
-        $this->info("Migración de pacientes mip completada. Se crearon saltaron {$count} citas.");
+        $this->info("Migración de pacientes mip completada. Se crearon {$count} citas.");
     }
 
     }
