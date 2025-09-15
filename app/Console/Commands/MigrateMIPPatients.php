@@ -187,8 +187,7 @@ class MigrateMIPPatients extends BaseCommand
                     }
                 });
         });
-    }
-
         $this->info("Migración de pacientes mip completada. Se crearon saltaron {$count} citas.");
     }
-}
+
+    }
