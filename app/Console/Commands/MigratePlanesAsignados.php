@@ -158,15 +158,15 @@ class MigratePlanesAsignados extends BaseCommand
                     $priceTerapia = $item_price;
 
                     $services = [
-                        ['field' => 'sesiones_utilizadas', 'type' => ItemType::AJUSTE->value, 'price' => $priceAjuste],
-                        ['field' => 'terapias_utilizadas', 'type' => ItemType::TERAPIA_FISICA->value, 'price' => $priceTerapia]
+                        ['field' => $p->sesiones_utilizadas, 'type' => ItemType::AJUSTE->value, 'price' => $priceAjuste],
+                        ['field' => $p->terapias_utilizadas, 'type' => ItemType::TERAPIA_FISICA->value, 'price' => $priceTerapia]
                     ];
 
                     foreach ($services as $service) {
-                        if ($p->{$service['field']} == 0) continue;
+                        if ($service['field'] == 0) continue;
 
                         $item = Item::where('plan', true)->where('type_of_item_id', $service['type'])->first();
-                        $sessions = (int) $p->{$service['field']};
+                        $sessions = (int) $service['field'];
 
                         $maxSessions = $assignedPlan->patient->acquired_services()
                             ->whereNotNull('plan_item_id')
@@ -184,7 +184,7 @@ class MigratePlanesAsignados extends BaseCommand
                                 'patient_id' => $p->paciente_id,
                                 'assigned_plan_id' => $assignedPlan->id,
                                 'plan_item_id' => $item->id,
-                                'price' => $service['price'],
+                                'price' => $service['price'] ?? 0,
                                 'status' => ServicesStatus::COMPLETADA->value,
                             ]);
                         }
