@@ -1,24 +1,26 @@
 <?php
+
 namespace App\Console\Commands;
 
-use App\Models\Patient;
+use App\Enums\AppointmentStatus;
+use App\Enums\AppointmentType;
 use App\Models\Appointment;
 use App\Models\Legacy\Cita;
+use App\Models\Legacy\Paciente;
+use App\Models\Patient;
 use App\Models\PatientGroup;
 use App\Models\WhereHeMetUs;
-use App\Enums\AppointmentType;
-use App\Models\Legacy\Paciente;
-use App\Enums\AppointmentStatus;
 use Illuminate\Support\Facades\DB;
 
 class MigratePatients extends BaseCommand
 {
     protected $signature = 'migrate:patients';
+
     protected $description = 'Migrar datos desde paciente (legacy) hacia patients (nuevo)';
 
     public function handle()
     {
-        $this->info("Iniciando migración de pacientes...");
+        $this->info('Iniciando migración de pacientes...');
 
         // Cargar datos de referencia una sola vez para mejorar rendimiento
         $whereHeMetUsOptions = WhereHeMetUs::all()->keyBy('id');
@@ -48,8 +50,7 @@ class MigratePatients extends BaseCommand
             ->get()
             ->keyBy('paciente_id');
 
-        Paciente::
-        whereNotIn('id', Patient::pluck('id')->toArray())->
+        Paciente::whereNotIn('id', Patient::pluck('id')->toArray())->
         chunk(500, function ($pacientes) use ($whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
             DB::transaction(function () use ($pacientes, $whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
                 $patientsToInsert = [];
@@ -85,17 +86,17 @@ class MigratePatients extends BaseCommand
                             'id' => $p->id,
                             'email' => $p->correo,
                             'identity_document' => $p->cedula_no == '' ? null : $p->cedula_no,
-                            'first_name' => $p->nombre ?? "",
-                            'last_name' => $p->apellido ?? "sin apellido",
+                            'first_name' => $p->nombre ?? '',
+                            'last_name' => $p->apellido ?? 'sin apellido',
                             'birth_date' => $this->parseDate($p->fecha_nacimiento),
-                            'mobile' => $p->celular ?? "",
-                            'phone' => $p->telefono ?? "",
+                            'mobile' => $p->celular ?? '',
+                            'phone' => $p->telefono ?? '',
                             'token' => rand(1000, 9999),
                             'gender' => $this->mapSexo($p->sexo),
                             'civil_status' => $p->estado_civil,
-                            'address' => $p->direccion ?? "",
-                            'occupation' => $p->ocupacion ?? "",
-                            'comment' => $p->comentario ?? "",
+                            'address' => $p->direccion ?? '',
+                            'occupation' => $p->ocupacion ?? '',
+                            'comment' => $p->comentario ?? '',
                             'branch_id' => $branch_id,
                             'patient_group_id' => $patientGroups->has($p->grupo) ? $p->grupo : 1,
                             'where_met_us_id' => $where_met_us_id ?? 1,
@@ -119,17 +120,18 @@ class MigratePatients extends BaseCommand
                                 AppointmentType::MIP->value :
                                 ($CitaTipoOld[$last_appointment_old->tipo] ?? AppointmentType::MIP->value);
 
-                            $appointmentData = [
-                                'note' => 'Cita de migración',
-                                'patient_id' => $p->id,
-                                'branch_id' => $branch_id,
-                                'type_of_appointment_id' => $TypeAppointment,
-                                'status_id' => $last_appointment_old->estado_id,
-                                'date' => $this->parseDateInt($last_appointment_old->dia),
-                                'hour' => $hourFormatted,
-                                'created_at' => $last_appointment_old->fecha,
-                                'updated_at' => now(),
-                            ];
+
+                                $appointmentData = [
+                                    'note' => 'Cita de migración',
+                                    'patient_id' => $p->id,
+                                    'branch_id' => $branch_id,
+                                    'type_of_appointment_id' => $TypeAppointment,
+                                    'status_id' => $last_appointment_old->estado_id,
+                                    'date' => $this->parseDateInt($last_appointment_old->dia),
+                                    'hour' => $hourFormatted,
+                                    'created_at' => $last_appointment_old->fecha,
+                                    'updated_at' => now(),
+                                ];
 
                             $appointmentsToInsert[] = $appointmentData;
                         }
@@ -140,7 +142,7 @@ class MigratePatients extends BaseCommand
                 }
 
                 // Inserción batch de pacientes
-                if (!empty($patientsToInsert)) {
+                if (! empty($patientsToInsert)) {
                     Patient::upsert($patientsToInsert, ['id'], [
                         'email',
                         'identity_document',
@@ -158,21 +160,23 @@ class MigratePatients extends BaseCommand
                         'branch_id',
                         'patient_group_id',
                         'where_met_us_id',
-                        'updated_at'
+                        'updated_at',
                     ]);
-                    $this->info("Insertados/actualizados " . count($patientsToInsert) . " pacientes");
+                    $this->info('Insertados/actualizados '.count($patientsToInsert).' pacientes');
 
                     // Solo insertar citas después de que los pacientes se hayan insertado exitosamente
-                    if (!empty($appointmentsToInsert)) {
-                        // Verificar que todos los pacientes de las citas existen
-                        $patientIds = collect($patientsToInsert)->pluck('id')->toArray();
-                        $validAppointments = collect($appointmentsToInsert)->filter(function($appointment) use ($patientIds) {
-                            return in_array($appointment['patient_id'], $patientIds);
+                    if (! empty($appointmentsToInsert)) {
+                        // Verificar que todos los pacientes de las citas existen en la base de datos
+                        $appointmentPatientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
+                        $existingPatientIds = Patient::whereIn('id', $appointmentPatientIds)->pluck('id')->toArray();
+
+                        $validAppointments = collect($appointmentsToInsert)->filter(function ($appointment) use ($existingPatientIds) {
+                            return in_array($appointment['patient_id'], $existingPatientIds);
                         })->toArray();
 
-                        if (!empty($validAppointments)) {
+                        if (! empty($validAppointments)) {
                             Appointment::insert($validAppointments);
-                            $this->info("Insertadas " . count($validAppointments) . " citas");
+                            $this->info('Insertadas '.count($validAppointments).' citas');
                         }
 
                         $skippedAppointments = count($appointmentsToInsert) - count($validAppointments);
@@ -182,17 +186,17 @@ class MigratePatients extends BaseCommand
                     }
                 } else {
                     // Si no hay pacientes para insertar, verificar que las citas tengan pacientes válidos
-                    if (!empty($appointmentsToInsert)) {
+                    if (! empty($appointmentsToInsert)) {
                         $patientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
                         $existingPatients = Patient::whereIn('id', $patientIds)->pluck('id')->toArray();
 
-                        $validAppointments = collect($appointmentsToInsert)->filter(function($appointment) use ($existingPatients) {
+                        $validAppointments = collect($appointmentsToInsert)->filter(function ($appointment) use ($existingPatients) {
                             return in_array($appointment['patient_id'], $existingPatients);
                         })->toArray();
 
-                        if (!empty($validAppointments)) {
+                        if (! empty($validAppointments)) {
                             Appointment::insert($validAppointments);
-                            $this->info("Insertadas " . count($validAppointments) . " citas");
+                            $this->info('Insertadas '.count($validAppointments).' citas');
                         }
 
                         $skippedAppointments = count($appointmentsToInsert) - count($validAppointments);
@@ -204,10 +208,8 @@ class MigratePatients extends BaseCommand
             });
         });
 
-        $this->info("Migración de pacientes completada.");
+        $this->info('Migración de pacientes completada.');
     }
-
-
 
     private function mapSexo($sexo)
     {
@@ -217,6 +219,4 @@ class MigratePatients extends BaseCommand
             default => null,
         };
     }
-
-
 }
