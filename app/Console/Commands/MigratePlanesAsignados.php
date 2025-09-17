@@ -51,6 +51,11 @@ class MigratePlanesAsignados extends BaseCommand
                         continue;
                     }
 
+                    if (AssignedPlan::find($p->id)) {
+                        $this->warn("Plan asignado ya existe - ID: {$p->id}. Omitiendo registro.");
+                        continue;
+                    }
+
 
                     $assignedPlan = AssignedPlan::create(
                         [
