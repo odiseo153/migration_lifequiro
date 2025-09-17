@@ -5,11 +5,8 @@ namespace App\Console\Commands;
 use App\Models\Item;
 use App\Enums\ItemType;
 use App\Models\Patient;
-use App\Models\CreditNote;
 use App\Models\PatientItem;
 use App\Models\Legacy\Compra;
-use App\Models\Legacy\Balance;
-use App\Enums\PaymentMethodType;
 
 class MigrateCompras extends BaseCommand
 {

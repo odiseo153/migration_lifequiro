@@ -63,6 +63,9 @@ class BaseCommand extends Command
         }
     }
 
+
+
+
     public function parseDate($timestamp)
     {
         try {
@@ -81,8 +84,48 @@ class BaseCommand extends Command
                 return \Carbon\Carbon::createFromFormat('d-m-Y', $timestamp);
             }
 
-            return \Carbon\Carbon::parse($timestamp);
+            // Verificar si es una fecha en formato yyyy-mm-dd
+            if (is_string($timestamp) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $timestamp)) {
+                return \Carbon\Carbon::createFromFormat('Y-m-d', $timestamp);
+            }
+
+            // Verificar si es una fecha en formato dd/mm/yyyy
+            if (is_string($timestamp) && preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $timestamp)) {
+                return \Carbon\Carbon::createFromFormat('d/m/Y', $timestamp);
+            }
+
+            // Verificar si es una fecha en formato mm/dd/yyyy
+            if (is_string($timestamp) && preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $timestamp)) {
+                // Intentar primero como dd/mm/yyyy, si falla como mm/dd/yyyy
+                try {
+                    return \Carbon\Carbon::createFromFormat('d/m/Y', $timestamp);
+                } catch (\Exception $e) {
+                    return \Carbon\Carbon::createFromFormat('m/d/Y', $timestamp);
+                }
+            }
+
+            // Verificar si es un timestamp numérico válido
+            if (is_numeric($timestamp)) {
+                // Verificar que el timestamp esté en un rango razonable (entre 1970 y 2100)
+                $timestampInt = (int)$timestamp;
+                if ($timestampInt >= 0 && $timestampInt <= 4102444800) { // 2100-01-01
+                    return \Carbon\Carbon::createFromTimestamp($timestampInt);
+                }
+            }
+
+            // Intentar parsear con Carbon (maneja muchos formatos automáticamente)
+            $parsedDate = \Carbon\Carbon::parse($timestamp);
+
+            // Verificar que la fecha parseada sea válida y razonable
+            if ($parsedDate->year >= 1900 && $parsedDate->year <= 2100) {
+                return $parsedDate;
+            }
+
+            // Si la fecha no está en un rango razonable, retornar fecha actual
+            return now();
+
         } catch (\Exception $e) {
+            // En caso de error, retornar fecha actual
             return now();
         }
     }
