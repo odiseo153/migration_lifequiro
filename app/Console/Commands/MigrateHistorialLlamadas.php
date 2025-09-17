@@ -51,6 +51,11 @@ class MigrateHistorialLlamadas extends BaseCommand
                 foreach ($llamadas as $llamada) {
                     $patient = Patient::find($llamada->paciente_id);
 
+                    if (!$patient) {
+                        $this->warn("Paciente no encontrado - ID: {$llamada->paciente_id}. Omitiendo registro.");
+                        continue;
+                    }
+
                     $appointment = $patient->appointments()->first();
 
                     if (!$appointment) {
