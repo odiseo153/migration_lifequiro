@@ -158,8 +158,8 @@ class MigratePlanesAsignados extends BaseCommand
                     $priceTerapia = $item_price;
 
                     $services = [
-                        ['field' => $p->sesiones_utilizadas, 'type' => ItemType::AJUSTE->value, 'price' => $priceAjuste],
-                        ['field' => $p->terapias_utilizadas, 'type' => ItemType::TERAPIA_FISICA->value, 'price' => $priceTerapia]
+                        ['field' => $p->sesiones_utilizadas, 'type' => ItemType::AJUSTE->value, 'price' => $priceAjuste,'max_sessions' => $assignedPlan->plan->total_sessions],
+                        ['field' => $p->terapias_utilizadas, 'type' => ItemType::TERAPIA_FISICA->value, 'price' => $priceTerapia,'max_sessions' => $assignedPlan->plan->therapies_number]
                     ];
 
                     foreach ($services as $service) {
@@ -168,14 +168,7 @@ class MigratePlanesAsignados extends BaseCommand
                         $item = Item::where('plan', true)->where('type_of_item_id', $service['type'])->first();
                         $sessions = (int) $service['field'];
 
-                        $maxSessions = $assignedPlan->patient->acquired_services()
-                            ->whereNotNull('plan_item_id')
-                            ->whereNotNull('assigned_plan_id')
-                            ->whereHas('patient_plan_item', function($query) use ($service) {
-                                $query->where('type_of_item_id', $service['type']);
-                            })
-                            ->where('assigned_plan_id', $assignedPlan->id)
-                            ->count() ?? 0;
+                        $maxSessions = $service['max_sessions'];
 
                         $sessions = min($sessions, $maxSessions);
 
