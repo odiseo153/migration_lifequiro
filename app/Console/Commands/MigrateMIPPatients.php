@@ -140,7 +140,9 @@ class MigrateMIPPatients extends BaseCommand
                             }
                         }
 
-                        if ($patient->appointments()->where('type_of_appointment_id', AppointmentType::MIP->value)->exists()) {
+                        if ($patient->appointments()
+                        ->where('type_of_appointment_id', '>=',AppointmentType::REPORTE->value)
+                    ->where('status_id', AppointmentStatus::COMPLETADA->value)->exists()) {
                             continue;
                         }
 

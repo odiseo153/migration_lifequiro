@@ -157,11 +157,6 @@ class MigratePlanesAsignados extends BaseCommand
                     $priceAjuste = $item_price;
                     $priceTerapia = $item_price;
 
-                    $services = [
-                        ['field' => $p->sesiones_utilizadas, 'type' => ItemType::AJUSTE->value, 'price' => $priceAjuste,'max_sessions' => $assignedPlan->plan->total_sessions],
-                        ['field' => $p->terapias_utilizadas, 'type' => ItemType::TERAPIA_FISICA->value, 'price' => $priceTerapia,'max_sessions' => $assignedPlan->plan->therapies_number]
-                    ];
-
                     $used_sessions = $assignedPlan->patient->acquired_services()
                     ->whereNotNull('plan_item_id')
                     ->whereNotNull('assigned_plan_id')
