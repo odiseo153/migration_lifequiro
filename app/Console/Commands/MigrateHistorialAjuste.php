@@ -40,8 +40,8 @@ class MigrateHistorialAjuste extends BaseCommand
         $this->info("Iniciando migración de historial ajuste...");
 
         HistorialAjuste::
-        whereNotIn('id', MedicalAjusteModule::pluck('id')->toArray())
-        ->chunk(500, function ($historiales) {
+        //whereNotIn('id', MedicalAjusteModule::pluck('id')->toArray())
+        chunk(500, function ($historiales) {
             DB::transaction(function () use ($historiales) {
                 foreach ($historiales as $historial) {
 
