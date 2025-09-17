@@ -34,15 +34,15 @@ class MigrateHistorialLlamadas extends BaseCommand
     {
         $this->info("Iniciando migración de historial llamadas...");
 
-        Cita::where('nota_cita', '!=', '')
+        Cita::
+        where('nota_cita', '!=', '')
+        ->whereIn('usuario_id',User::pluck('id')->toArray())
+        ->whereIn('paciente_id',Patient::pluck('id')->toArray())
             ->whereIn('estado_id', [AppointmentStatus::POSPUESTA->value, AppointmentStatus::NO_ASISTIO->value, AppointmentStatus::REPROGRAMADA->value, AppointmentStatus::DESACTIVADA->value])
             ->chunk(500, function ($llamadas) {
                 foreach ($llamadas as $llamada) {
                     $patient = Patient::find($llamada->paciente_id);
-                    if (!$patient) {
-                        $this->warn("Paciente no encontrado - ID: {$llamada->paciente_id}. Omitiendo registro.");
-                        continue;
-                    }
+
                     $appointment = $patient->appointments()->first();
 
                     if (!$appointment) {
@@ -50,16 +50,14 @@ class MigrateHistorialLlamadas extends BaseCommand
                         continue;
                     }
 
-                    $user = User::find($llamada->usuario_id);
-                    if (!$user) {
-                        $this->warn("Usuario no encontrado. Omitiendo registro.");
+                    if ($appointment->call_histories()->exists()) {
+                        $this->warn("La cita ya tiene historial.");
                         continue;
                     }
 
-
                     CallHistory::create([
                         'appointment_id' => $appointment->id,
-                        'user_id' => $user->id,
+                        'user_id' => $llamada->usuario_id,
                         'note' => $llamada->nota_cita,
                         'old_status' => $llamada->estado_id,
                         'new_status' => $appointment->status_id,

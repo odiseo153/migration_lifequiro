@@ -28,6 +28,7 @@ class MigratePlanesAsignados extends BaseCommand
 
         Ajuste::
         whereNotIn('plan_id', $this->ignored_plan)
+        ->whereNotIn('id', AssignedPlan::pluck('id')->toArray())
         ->chunk(500, function ($pacientes) {
             $user = User::first();
             foreach ($pacientes as $p) {
@@ -50,12 +51,6 @@ class MigratePlanesAsignados extends BaseCommand
                         $this->warn("Plan no encontrado - ID: {$p->plan_id}. Omitiendo registro.");
                         continue;
                     }
-
-                    if (AssignedPlan::find($p->id)) {
-                        $this->warn("Plan asignado ya existe - ID: {$p->id}. Omitiendo registro.");
-                        continue;
-                    }
-
 
                     $assignedPlan = AssignedPlan::create(
                         [

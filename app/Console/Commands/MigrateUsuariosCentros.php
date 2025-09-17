@@ -30,6 +30,16 @@ class MigrateUsuariosCentros extends BaseCommand
                     $this->warn("Centro no encontrado - ID: {$p->centro_id}. Omitiendo registro.");
                     continue;
                 }
+                $branch_user = BranchUser::where([
+                    'user_id' => $user->id,
+                    'branch_id' => $branch->id,
+                ])->first();
+
+                if ($branch_user) {
+                    $this->warn("Relacion ya existente.");
+                    continue;
+                }
+
 
                 BranchUser::create([
                     'user_id' => $user->id,

@@ -33,6 +33,7 @@ class MigrateBalance extends BaseCommand
         Balance::
         where('monto', '>', 0)
         ->where('estado', 1)
+        ->whereNotIn('id', CreditNote::pluck('id')->toArray())
         ->chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
                 if (!Patient::find($p->paciente_id)) {
@@ -40,11 +41,8 @@ class MigrateBalance extends BaseCommand
                     continue;
                 }
 
-                CreditNote::updateOrCreate(
-                    [
-                        'id' => $p->id,
-                    ],
-                    [
+                CreditNote::create(
+       [
                     'id' => $p->id,
                     'patient_id' => $p->paciente_id,
                     'amount' => $p->monto,

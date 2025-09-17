@@ -31,18 +31,13 @@ class MigrateAntecedentes extends BaseCommand
     {
         $this->info("Iniciando migración de De antecedentes...");
 
-        Antecedente::chunk(100, function ($antecedentes) {
-
+        Antecedente::
+        whereNotIn('paciente_id', MedicalRecord::pluck('patient_id')->toArray())
+        ->chunk(100, function ($antecedentes) {
             foreach ($antecedentes as $antecedente) {
                 $patient = Patient::find($antecedente->paciente_id);
                 if (!$patient) {
                     $this->warn("Paciente no encontrado - ID: {$antecedente->paciente_id}. Omitiendo registro.");
-                    continue;
-                }
-
-                // Verificar si ya existe un registro médico para este paciente
-                if (MedicalRecord::where('patient_id', $patient->id)->exists()) {
-                    $this->warn("Paciente ya tiene registro médico - ID: {$antecedente->paciente_id}. Omitiendo registro.");
                     continue;
                 }
 

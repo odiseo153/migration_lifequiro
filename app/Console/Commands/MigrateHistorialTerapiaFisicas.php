@@ -97,7 +97,9 @@ class MigrateHistorialTerapiaFisicas extends BaseCommand
 
 
 
-        HistorialTerapia::chunk(500, function ($historiales) use ($itemsMatchTerapiaFisica) {
+        HistorialTerapia::
+        whereNotIn('id', MedicalTerapiaTracionModule::pluck('id')->toArray())
+        ->chunk(500, function ($historiales) use ($itemsMatchTerapiaFisica) {
             DB::transaction(function () use ($historiales,$itemsMatchTerapiaFisica) {
                 foreach ($historiales as $historial) {
 

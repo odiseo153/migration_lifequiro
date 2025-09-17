@@ -33,7 +33,10 @@ class MigrateCitasProgramadas extends BaseCommand
 
         //por cada dia hay una hora, quiero que crees una entidad por cada dia y le pongas su hora por ejemplo los dias vienen asi :"l,i"
 
-        CitasProgramadas::chunk(500, function ($pacientes) {
+        CitasProgramadas::
+        whereNotIn('id', ProgrammingHistory::pluck('id')->toArray())
+        ->whereIn('ajuste_plan_id', AssignedPlan::whereIn('status', [PlanStatus::Activo->value])->pluck('id')->toArray())
+        ->chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
                 $assignedPlan = AssignedPlan::whereIn('status', [PlanStatus::Activo->value])->find($p->ajuste_plan_id);
                 $patient = Patient::find($p->paciente_id);
@@ -45,12 +48,6 @@ class MigrateCitasProgramadas extends BaseCommand
                     continue;
                 }
 
-                if (
-                    $assignedPlan == null
-                ) {
-                    $this->warn("plan no encontrado o no esta activo - ID: {$p->ajuste_plan_id}. Omitiendo registro.");
-                    continue;
-                }
 
                 if (
                     $p->dias == '' && $p->horas == ''

@@ -47,7 +47,8 @@ class MigrateCompras extends BaseCommand
 
         \DB::transaction(function() use ($comprasTipo) {
             Compra::
-                where('estado', 1)
+                whereNotIn('id', PatientItem::pluck('id')->toArray())
+                ->where('estado', 1)
                 ->where('tipo_servicio','!=', 0)
                 ->chunk(500, function ($pacientes) use ($comprasTipo) {
                     foreach ($pacientes as $p) {

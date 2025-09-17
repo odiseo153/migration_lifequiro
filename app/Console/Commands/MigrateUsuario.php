@@ -39,7 +39,7 @@ class MigrateUsuario extends BaseCommand
                     'first_name'  => mb_convert_encoding($u->nombre, 'UTF-8', 'auto'),
                     'last_name'  => mb_convert_encoding($u->apellido, 'UTF-8', 'auto'),
                     'email' => $this->randomEmail($u->nombre),
-                    'username' => $this->randomUsername($u->nombre),
+                    'username' => $u->nombre,
                     'password' => Hash::make('12345678'),
                     'position_id' => Position::find($u->puesto)?->id ?? 1,
                 ]);

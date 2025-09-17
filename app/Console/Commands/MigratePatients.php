@@ -48,7 +48,9 @@ class MigratePatients extends BaseCommand
             ->get()
             ->keyBy('paciente_id');
 
-        Paciente::chunk(500, function ($pacientes) use ($whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
+        Paciente::
+        whereNotIn('id', Patient::pluck('id')->toArray())->
+        chunk(500, function ($pacientes) use ($whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
             $patientsToInsert = [];
             $appointmentsToInsert = [];
 
