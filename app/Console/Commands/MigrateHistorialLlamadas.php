@@ -34,10 +34,18 @@ class MigrateHistorialLlamadas extends BaseCommand
     {
         $this->info("Iniciando migración de historial llamadas...");
 
+        // Obtener IDs de citas que ya tienen CallHistory
+        $appointmentIdsWithCallHistory = CallHistory::pluck('appointment_id')->toArray();
+
+        // Obtener IDs de pacientes cuyas citas no tienen CallHistory
+        $patientIdsWithoutCallHistory = Patient::whereHas('appointments', function ($query) use ($appointmentIdsWithCallHistory) {
+            $query->whereNotIn('id', $appointmentIdsWithCallHistory);
+        })->pluck('id')->toArray();
+
         Cita::
         where('nota_cita', '!=', '')
         ->whereIn('usuario_id',User::pluck('id')->toArray())
-        ->whereIn('paciente_id',Patient::pluck('id')->toArray())
+        ->whereIn('paciente_id', $patientIdsWithoutCallHistory)
             ->whereIn('estado_id', [AppointmentStatus::POSPUESTA->value, AppointmentStatus::NO_ASISTIO->value, AppointmentStatus::REPROGRAMADA->value, AppointmentStatus::DESACTIVADA->value])
             ->chunk(500, function ($llamadas) {
                 foreach ($llamadas as $llamada) {
