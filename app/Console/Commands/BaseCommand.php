@@ -79,6 +79,14 @@ class BaseCommand extends Command
                 return now();
             }
 
+            // Verificar si la fecha inicia con año negativo o año 0000 o -0001
+            if (is_string($timestamp) && preg_match('/^-?\d{1,4}-/', $timestamp)) {
+                $year = (int)substr($timestamp, 0, strpos($timestamp, '-', 1));
+                if ($year <= 0) {
+                    return now();
+                }
+            }
+
             // Verificar si es una fecha en formato dd-mm-yyyy
             if (is_string($timestamp) && preg_match('/^\d{2}-\d{2}-\d{4}$/', $timestamp)) {
                 return \Carbon\Carbon::createFromFormat('d-m-Y', $timestamp);
