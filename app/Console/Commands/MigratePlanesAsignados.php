@@ -162,26 +162,56 @@ class MigratePlanesAsignados extends BaseCommand
                         ['field' => $p->terapias_utilizadas, 'type' => ItemType::TERAPIA_FISICA->value, 'price' => $priceTerapia,'max_sessions' => $assignedPlan->plan->therapies_number]
                     ];
 
-                    foreach ($services as $service) {
-                        if ($service['field'] == 0) continue;
+                    $used_sessions = $assignedPlan->patient->acquired_services()
+                    ->whereNotNull('plan_item_id')
+                    ->whereNotNull('assigned_plan_id')
+                    ->whereHas('patient_plan_item', function($query){
+                        $query->where('type_of_item_id', ItemType::AJUSTE->value);
+                    })
+                    ->where('assigned_plan_id', $assignedPlan->id)
+                    ->count();
 
-                        $item = Item::where('plan', true)->where('type_of_item_id', $service['type'])->first();
-                        $sessions = (int) $service['field'];
+                    $used_therapies = $assignedPlan->patient->acquired_services()
+                    ->whereNotNull('plan_item_id')
+                    ->whereNotNull('assigned_plan_id')
+                    ->whereHas('patient_plan_item', function($query){
+                        $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
+                    })
+                    ->where('assigned_plan_id', $assignedPlan->id)
+                    ->count();
 
-                        $maxSessions = $service['max_sessions'];
+                    if ($p->sesiones_utilizadas != 0 ) {
+                        $itemAjuste = Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first();
+                        $sessiones = (int) $p->sesiones_utilizadas;
+                        for ($i = 0; $i < $sessiones; $i++) {
+                            if ($used_sessions >= $p->sesiones_utilizadas) break;
 
-                        $sessions = min($sessions, $maxSessions);
-
-                        for ($i = 0; $i < $sessions; $i++) {
                             AcquiredService::create([
                                 'patient_id' => $p->paciente_id,
                                 'assigned_plan_id' => $assignedPlan->id,
-                                'plan_item_id' => $item->id,
-                                'price' => $service['price'] ?? 0,
+                                'plan_item_id' => $itemAjuste->id,
+                                'price' => $priceAjuste,
                                 'status' => ServicesStatus::COMPLETADA->value,
                             ]);
                         }
                     }
+
+                    if ($p->terapias_utilizadas != 0) {
+                        $itemTerapia = Item::where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first();
+
+                        $terapias = (int) $p->terapias_utilizadas;
+                        for ($i = 0; $i < $terapias; $i++) {
+                            if ($used_therapies >= $p->terapias_utilizadas) break;
+                            AcquiredService::create([
+                                'patient_id' => $p->paciente_id,
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'plan_item_id' => $itemTerapia->id,
+                                'price' => $priceTerapia,
+                                'status' => ServicesStatus::COMPLETADA->value,
+                            ]);
+                        }
+                    }
+
 
                 }
 
