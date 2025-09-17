@@ -27,8 +27,8 @@ class MigratePlanesAsignados extends BaseCommand
         $this->info("Iniciando migración de planes asignados...");
 
         Ajuste::
-        whereNotIn('plan_id', $this->ignored_plan)
-        ->whereNotIn('id', AssignedPlan::pluck('id')->toArray())
+        whereIn('paciente_id', Patient::pluck('id')->toArray())
+        ->whereIn('plan_id', Plan::whereNotIn('id', $this->ignored_plan)->pluck('id')->toArray())
         ->chunk(500, function ($pacientes) {
             $user = User::first();
             foreach ($pacientes as $p) {
@@ -41,11 +41,6 @@ class MigratePlanesAsignados extends BaseCommand
                         4 => PlanStatus::Desactivado->value,
                     ];
 
-                    // Verificar si el paciente existe
-                    if (!Patient::find($p->paciente_id)) {
-                        $this->warn("Paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
-                        continue;
-                    }
 
                     if (!Plan::find($p->plan_id)) {
                         $this->warn("Plan no encontrado - ID: {$p->plan_id}. Omitiendo registro.");
