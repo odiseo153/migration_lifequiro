@@ -29,12 +29,12 @@ class MigrateAll extends Command
         //
        // $this->call('migrate:usuarios');
       //  $this->call('migrate:usuarios-centros');
-        $this->call('migrate:patients');//
+       // $this->call('migrate:patients');//
        // $this->call('migrate:planes');
-        $this->call('migrate:planes-asignados');//
+       // $this->call('migrate:planes-asignados');//
        // $this->call('migrate:historial-llamadas');//
-        $this->call('migrate:citas-programadas');//
-        $this->call('migrate:historial-ajuste');//
+       // $this->call('migrate:citas-programadas');//
+      //  $this->call('migrate:historial-ajuste');//
         $this->call('migrate:historial-terapia-fisica');//
         $this->call('migrate:antecedentes');//
         $this->call('migrate:balance');//

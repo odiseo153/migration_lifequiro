@@ -41,12 +41,15 @@ class MigrateCompras extends BaseCommand
             8 => ItemType::TRACCION->value,
             9 => ItemType::TERAPIA_FISICA->value,
         ];
+        $patientIds = Patient::
+        where('branch_id',5)
+       ->pluck('id')->toArray();
 
-        \DB::transaction(function() use ($comprasTipo) {
+        \DB::transaction(function() use ($comprasTipo, $patientIds) {
             Compra::
-                whereNotIn('id', PatientItem::pluck('id')->toArray())
-                ->where('estado', 1)
-                ->where('tipo_servicio','!=', 0)
+            where('estado', 1)
+            ->where('tipo_servicio','!=', 0)
+            ->whereIn('paciente_id', $patientIds)
                 ->chunk(500, function ($pacientes) use ($comprasTipo) {
                     foreach ($pacientes as $p) {
                         if (!Patient::find($p->paciente_id)) {
