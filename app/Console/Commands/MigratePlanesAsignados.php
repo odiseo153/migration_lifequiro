@@ -112,6 +112,9 @@ class MigratePlanesAsignados extends BaseCommand
                         // Calcular cuántos vouchers necesitamos: consumido / precio_por_item
                         $vouchers_needed = round($p->consumido / $item_price);
 
+                        // Asegurar que no creamos más vouchers de los que realmente se consumieron
+                        $vouchers_needed = min($vouchers_needed, $total_consumed_items);
+
                         for ($i = 0; $i < $vouchers_needed; $i++) {
                             Voucher::create([
                                 'assigned_plan_id' => $assignedPlan->id,
@@ -136,34 +139,57 @@ class MigratePlanesAsignados extends BaseCommand
                         }
                     }
 
+                    // Verificar y eliminar vouchers excedentes si el total supera el consumo real
+                    $created_vouchers = Voucher::where('assigned_plan_id', $assignedPlan->id)->get();
+                    $total_voucher_value = $created_vouchers->sum('price');
+
+                    if ($total_voucher_value > $p->consumido && $p->consumido > 0) {
+                        // Eliminar vouchers hasta que el total coincida con el consumo
+                        $excess_value = $total_voucher_value - $p->consumido;
+                        $vouchers_to_delete = $created_vouchers->sortByDesc('created_at');
+
+                        foreach ($vouchers_to_delete as $voucher) {
+                            if ($excess_value <= 0) break;
+
+                            if ($voucher->price <= $excess_value) {
+                                $excess_value -= $voucher->price;
+                                $voucher->delete();
+                            }
+                        }
+                    }
+
                     // Usar el precio por ítem para todos los servicios adquiridos
                     $priceAjuste = $item_price;
                     $priceTerapia = $item_price;
 
-                    if ($p->sesiones_utilizadas != 0) {
-                        $itemAjuste = Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first();
-                        $sessiones = (int) $p->sesiones_utilizadas;
-                        for ($i = 0; $i < $sessiones; $i++) {
+                    $services = [
+                        ['field' => 'sesiones_utilizadas', 'type' => ItemType::AJUSTE->value, 'price' => $priceAjuste],
+                        ['field' => 'terapias_utilizadas', 'type' => ItemType::TERAPIA_FISICA->value, 'price' => $priceTerapia]
+                    ];
+
+                    foreach ($services as $service) {
+                        if ($p->{$service['field']} == 0) continue;
+
+                        $item = Item::where('plan', true)->where('type_of_item_id', $service['type'])->first();
+                        $sessions = (int) $p->{$service['field']};
+
+                        $maxSessions = $assignedPlan->patient->acquired_services()
+                            ->whereNotNull('plan_item_id')
+                            ->whereNotNull('assigned_plan_id')
+                            ->whereHas('patient_plan_item', function($query) use ($service) {
+                                $query->where('type_of_item_id', $service['type']);
+                            })
+                            ->where('assigned_plan_id', $assignedPlan->id)
+                            ->count() ?? 0;
+
+                        $sessions = min($sessions, $maxSessions);
+
+                        for ($i = 0; $i < $sessions; $i++) {
                             AcquiredService::create([
                                 'patient_id' => $p->paciente_id,
                                 'assigned_plan_id' => $assignedPlan->id,
-                                'plan_item_id' => $itemAjuste->id,
-                                'price' => $priceAjuste,
-                                'status' => ServicesStatus::COMPLETADA->value,
-                            ]);
-                        }
-                    }
-
-                    if ($p->terapias_utilizadas != 0) {
-                        $itemTerapia = Item::where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first();
-
-                        $terapias = (int) $p->terapias_utilizadas;
-                        for ($i = 0; $i < $terapias; $i++) {
-                            AcquiredService::create([
-                                'patient_id' => $p->paciente_id,
-                                'assigned_plan_id' => $assignedPlan->id,
-                                'plan_item_id' => $itemTerapia->id,
-                                'price' => $priceTerapia,
+                                'plan_item_id' => $item->id,
+                                'price' => $service['price'],
                                 'status' => ServicesStatus::COMPLETADA->value,
                             ]);
                         }
