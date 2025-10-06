@@ -1330,6 +1330,9 @@ namespace App\Models {
     /**
      * App\Models\Ars
      *
+     * @property string|null $rnc
+     * @property string|null $phone
+     * @property string|null $address
      * @property \Illuminate\Support\Carbon|null $deleted_at
      * @property \Illuminate\Support\Carbon|null $updated_at
      * @property \Illuminate\Support\Carbon|null $created_at
@@ -1343,6 +1346,9 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Ars>|Ars whereCreatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Ars>|Ars whereUpdatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Ars>|Ars whereDeletedAt($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<Ars>|Ars whereAddress($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<Ars>|Ars wherePhone($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<Ars>|Ars whereRnc($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Ars>|Ars name()
      * @method static \Illuminate\Database\Eloquent\Builder<Ars>|Ars dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<Ars>|Ars newModelQuery()
@@ -8483,6 +8489,7 @@ namespace App\Models {
     /**
      * App\Models\CreditAuthorization
      *
+     * @property mixed $branch_id
      * @property string $expiration_date
      * @property \Illuminate\Support\Carbon|null $deleted_at
      * @property \Illuminate\Support\Carbon|null $updated_at
@@ -8497,8 +8504,8 @@ namespace App\Models {
      * @property mixed $request_amount
      * @property \App\Enums\AuthorizationType $type
      * @property int $id
-     * @property-read mixed $total_consumed
      * @property-read mixed $remaining_amount
+     * @property-read mixed $total_consumed
      * @property-read mixed $name
      * @property-read \App\Models\Patient $patient
      * @property-read \App\Models\User $authorizedBy
@@ -8519,6 +8526,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<CreditAuthorization>|CreditAuthorization whereUpdatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<CreditAuthorization>|CreditAuthorization whereDeletedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<CreditAuthorization>|CreditAuthorization whereExpirationDate($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<CreditAuthorization>|CreditAuthorization whereBranchId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<CreditAuthorization>|CreditAuthorization name()
      * @method static \Illuminate\Database\Eloquent\Builder<CreditAuthorization>|CreditAuthorization dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<CreditAuthorization>|CreditAuthorization newModelQuery()
@@ -9478,6 +9486,8 @@ namespace App\Models {
     /**
      * App\Models\DescuentAuthorization
      *
+     * @property string|null $note
+     * @property mixed $branch_id
      * @property \Illuminate\Support\Carbon|null $deleted_at
      * @property \Illuminate\Support\Carbon|null $updated_at
      * @property \Illuminate\Support\Carbon|null $created_at
@@ -9493,8 +9503,8 @@ namespace App\Models {
      * @property mixed $request_amount
      * @property mixed $type
      * @property int $id
-     * @property-read mixed $total_consumed
      * @property-read mixed $remaining_amount
+     * @property-read mixed $total_consumed
      * @property-read mixed $name
      * @property-read \App\Models\Patient $patient
      * @property-read \App\Models\Item $item
@@ -9518,6 +9528,8 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<DescuentAuthorization>|DescuentAuthorization whereCreatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<DescuentAuthorization>|DescuentAuthorization whereUpdatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<DescuentAuthorization>|DescuentAuthorization whereDeletedAt($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<DescuentAuthorization>|DescuentAuthorization whereBranchId($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<DescuentAuthorization>|DescuentAuthorization whereNote($value)
      * @method static \Illuminate\Database\Eloquent\Builder<DescuentAuthorization>|DescuentAuthorization name()
      * @method static \Illuminate\Database\Eloquent\Builder<DescuentAuthorization>|DescuentAuthorization dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<DescuentAuthorization>|DescuentAuthorization newModelQuery()
@@ -10807,7 +10819,7 @@ namespace App\Models {
      * @property integer|null $file_size
      * @property string|null $file_name
      * @property string|null $file_path
-     * @property mixed $status
+     * @property string $status
      * @property array|null $filters_applied
      * @property string $name
      * @property mixed $user_id
@@ -12767,6 +12779,7 @@ namespace App\Models {
     /**
      * App\Models\Invoice
      *
+     * @property mixed $offer_id
      * @property mixed $status_ars
      * @property mixed $ars_id
      * @property string|null $no_authorization
@@ -12833,6 +12846,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice whereNoAuthorization($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice whereArsId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice whereStatusArs($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice whereOfferId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice name()
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice newModelQuery()
@@ -13138,6 +13152,7 @@ namespace App\Models {
     /**
      * App\Models\InvoiceArs
      *
+     * @property mixed $branch_id
      * @property string|null $code
      * @property \Illuminate\Support\Carbon|null $deleted_at
      * @property \Illuminate\Support\Carbon|null $updated_at
@@ -13164,6 +13179,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<InvoiceArs>|InvoiceArs whereUpdatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<InvoiceArs>|InvoiceArs whereDeletedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<InvoiceArs>|InvoiceArs whereCode($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<InvoiceArs>|InvoiceArs whereBranchId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<InvoiceArs>|InvoiceArs name()
      * @method static \Illuminate\Database\Eloquent\Builder<InvoiceArs>|InvoiceArs dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<InvoiceArs>|InvoiceArs newModelQuery()
@@ -15750,7 +15766,7 @@ namespace App\Models {
      * @property string|null $thoracic_vertebrae
      * @property string|null $cervical_vertebrae
      * @property mixed $pain_intensity
-     * @property string $pain_zones
+     * @property string|null $pain_zones
      * @property mixed $patient_id
      * @property mixed $patient_item_id
      * @property int $id
@@ -20403,6 +20419,9 @@ namespace App\Models {
     /**
      * App\Models\PatientItem
      *
+     * @property string|null $item_price
+     * @property mixed $item_type
+     * @property string|null $item_name
      * @property mixed $ars_paid_amount
      * @property string|null $no_document
      * @property mixed $type
@@ -20469,6 +20488,9 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereType($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereNoDocument($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereArsPaidAmount($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereItemName($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereItemType($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereItemPrice($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem name()
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem newModelQuery()
@@ -24726,7 +24748,7 @@ namespace App\Models {
      * @property \Illuminate\Support\Carbon|null $deleted_at
      * @property \Illuminate\Support\Carbon|null $updated_at
      * @property \Illuminate\Support\Carbon|null $created_at
-     * @property mixed $pre_authorization_number
+     * @property string|null $pre_authorization_number
      * @property mixed $insurance_id
      * @property mixed $patient_id
      * @property int $id
@@ -25372,6 +25394,7 @@ namespace App\Models {
     /**
      * App\Models\PreAuthorizationItem
      *
+     * @property mixed $mode_id
      * @property mixed $available
      * @property mixed $used
      * @property mixed $difference_per_service
@@ -25408,6 +25431,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem whereDifferencePerService($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem whereUsed($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem whereAvailable($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem whereModeId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem name()
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem newModelQuery()

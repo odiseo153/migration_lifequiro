@@ -82,10 +82,7 @@ class MigrateCitasProgramadas extends BaseCommand
                         // Convertir hora de formato AM/PM a 24 horas
                         $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $hour)->format('H:i:s');
 
-                        ProgrammingHistory::updateOrCreate([
-                            'id' => $p->id,
-                        ], [
-                            'id' => $p->id,
+                        ProgrammingHistory::create([
                             'branch_id' => $assignedPlan->branch_id,
                             'patient_id' => $p->paciente_id,
                             'assigned_plan_id' => $p->ajuste_plan_id,
