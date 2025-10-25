@@ -12779,6 +12779,7 @@ namespace App\Models {
     /**
      * App\Models\Invoice
      *
+     * @property string|null $ars_date
      * @property mixed $offer_id
      * @property mixed $status_ars
      * @property mixed $ars_id
@@ -12847,6 +12848,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice whereArsId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice whereStatusArs($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice whereOfferId($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice whereArsDate($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice name()
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<Invoice>|Invoice newModelQuery()
@@ -20419,6 +20421,9 @@ namespace App\Models {
     /**
      * App\Models\PatientItem
      *
+     * @property mixed $ars_secure
+     * @property mixed $ars_co_payment
+     * @property mixed $ars_coberture
      * @property string|null $item_price
      * @property mixed $item_type
      * @property string|null $item_name
@@ -20491,6 +20496,9 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereItemName($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereItemType($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereItemPrice($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereArsCoberture($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereArsCoPayment($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereArsSecure($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem name()
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem newModelQuery()
@@ -24744,6 +24752,7 @@ namespace App\Models {
     /**
      * App\Models\PreAuthorization
      *
+     * @property bool $is_pending
      * @property mixed $item_document_count
      * @property \Illuminate\Support\Carbon|null $deleted_at
      * @property \Illuminate\Support\Carbon|null $updated_at
@@ -24771,6 +24780,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization whereUpdatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization whereDeletedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization whereItemDocumentCount($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization whereIsPending($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization name()
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization newModelQuery()
@@ -25394,6 +25404,7 @@ namespace App\Models {
     /**
      * App\Models\PreAuthorizationItem
      *
+     * @property mixed $secure
      * @property mixed $mode_id
      * @property mixed $available
      * @property mixed $used
@@ -25432,6 +25443,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem whereUsed($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem whereAvailable($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem whereModeId($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem whereSecure($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem name()
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorizationItem>|PreAuthorizationItem newModelQuery()
