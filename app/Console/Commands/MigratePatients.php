@@ -101,6 +101,7 @@ class MigratePatients extends BaseCommand
                             'patient_group_id' => $patientGroups->has($p->grupo) ? $p->grupo : 1,
                             'where_met_us_id' => $where_met_us_id ?? 1,
                             'created_at' => $p->fecha == null ? now() : $this->parseDateInt($p->fecha),
+                            'updated_at' => now(),
                         ];
 
                         $patientsToInsert[] = $patientData;
