@@ -13,11 +13,9 @@ class MigratePlanes extends BaseCommand
     {
         $this->info("Iniciando migración de planes...");
 
-        Planes::chunk(100, function ($pacientes) {
+        Planes::whereNotIn('id',Plan::pluck('id'))-> chunk(100, function ($pacientes) {
             foreach ($pacientes as $p) {
-                $plan = Plan::updateOrCreate([
-                    'id' => $p->id,
-                ], [
+                $plan = Plan::create([
                     'id' => $p->id,
                     'name' => $p->plan,
                     'code' => $p->codigo ?? 'GENERATED-' . $this->generateRandomCode(Plan::class, 8, 'code'),
@@ -32,7 +30,9 @@ class MigratePlanes extends BaseCommand
                     'updated_at' => $this->parseDateInt($p->fecha),
                 ]);
 
-                $plan->branches()->sync($p->centro_id);
+                if (!$plan->branches()->where('branch_id', $p->centro_id)->exists()) {
+                    $plan->branches()->attach($p->centro_id);
+                }
             }
         });
 

@@ -86,7 +86,7 @@ class MigratePatients extends BaseCommand
                             'id' => $p->id,
                             'email' => $p->correo,
                             'identity_document' => $p->cedula_no == '' ? null : $p->cedula_no,
-                            'first_name' => $p->nombre ?? '',
+                            'first_name' => $p->nombre ?? 'sin nombre',
                             'last_name' => $p->apellido ?? 'sin apellido',
                             'birth_date' => $this->parseDate($p->fecha_nacimiento),
                             'mobile' => $p->celular ?? '',
@@ -101,7 +101,6 @@ class MigratePatients extends BaseCommand
                             'patient_group_id' => $patientGroups->has($p->grupo) ? $p->grupo : 1,
                             'where_met_us_id' => $where_met_us_id ?? 1,
                             'created_at' => $p->fecha == null ? now() : $this->parseDateInt($p->fecha),
-                            'updated_at' => now(),
                         ];
 
                         $patientsToInsert[] = $patientData;

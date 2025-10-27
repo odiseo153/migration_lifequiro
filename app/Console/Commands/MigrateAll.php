@@ -38,7 +38,7 @@ class MigrateAll extends Command
       //  $this->call('migrate:historial-ajuste');//
        // $this->call('migrate:historial-terapia-fisica');//
        // $this->call('migrate:antecedentes');//
-        //$this->call('migrate:balance');//
+        $this->call('migrate:balance');//
         $this->info("Migración de todos los datos completada.");
     }
 }
