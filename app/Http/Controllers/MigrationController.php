@@ -979,6 +979,290 @@ class MigrationController extends Controller
     }
 
     /**
+     * Update assigned plan data including therapies and sessions
+     * This endpoint allows correction of consumed therapies and sessions
+     */
+    public function updateAssignedPlan(Request $request)
+    {
+        $request->validate([
+            'patient_id' => 'required|integer|exists:patients,id',
+            'therapies_number' => 'nullable|integer|min:0',
+            'consumed_therapies' => 'nullable|integer|min:0',
+            'total_sessions' => 'nullable|integer|min:0',
+            'consumed_sessions' => 'nullable|integer|min:0',
+            'amount' => 'nullable|numeric|min:0',
+            'date_start' => 'nullable|date',
+            'date_end' => 'nullable|date|after_or_equal:date_start',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Find the assigned plan
+            $assignedPlan = AssignedPlan::with(['plan', 'patient', 'services', 'voucher'])
+                ->where('patient_id', $request->patient_id)
+                ->first();
+
+            if (!$assignedPlan) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Plan asignado no encontrado para el paciente ' . $request->patient_id
+                ], 404);
+            }
+            // Store original values for comparison
+            $originalTherapiesNumber = $assignedPlan->therapies_number;
+            $originalTotalSessions = $assignedPlan->total_sessions;
+
+            // Get current consumed counts
+            $currentConsumedSessions = $assignedPlan->patient->acquired_services()
+                ->whereNotNull('plan_item_id')
+                ->whereNotNull('assigned_plan_id')
+                ->whereHas('patient_plan_item', function($query) {
+                    $query->where('type_of_item_id', ItemType::AJUSTE->value);
+                })
+                ->where('assigned_plan_id', $assignedPlan->id)
+                ->count();
+
+            $currentConsumedTherapies = $assignedPlan->patient->acquired_services()
+                ->whereNotNull('plan_item_id')
+                ->whereNotNull('assigned_plan_id')
+                ->whereHas('patient_plan_item', function($query) {
+                    $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
+                })
+                ->where('assigned_plan_id', $assignedPlan->id)
+                ->count();
+
+            // Update basic plan data if provided
+            if ($request->has('therapies_number')) {
+                $assignedPlan->therapies_number = $request->therapies_number;
+            }
+
+            if ($request->has('total_sessions')) {
+                $assignedPlan->total_sessions = $request->total_sessions;
+            }
+
+
+            if ($request->has('amount')) {
+                $assignedPlan->amount = $request->amount;
+            }
+
+            if ($request->has('date_start')) {
+                $assignedPlan->date_start = $request->date_start;
+            }
+
+            if ($request->has('date_end')) {
+                $assignedPlan->date_end = $request->date_end;
+            }
+
+            // Calculate new item price based on updated values
+            $total_items = $assignedPlan->total_sessions + $assignedPlan->therapies_number;
+            $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
+
+            // Handle sessions adjustment
+            if ($request->has('consumed_sessions')) {
+                $targetConsumedSessions = $request->consumed_sessions;
+                $sessionsDifference = $targetConsumedSessions - $currentConsumedSessions;
+
+                if ($sessionsDifference > 0) {
+                    // Need to add more consumed sessions
+                    $itemAjuste = Item::where('plan', true)
+                        ->where('type_of_item_id', ItemType::AJUSTE->value)
+                        ->first();
+
+                    if ($itemAjuste) {
+                        for ($i = 0; $i < $sessionsDifference; $i++) {
+                            AcquiredService::create([
+                                'patient_id' => $assignedPlan->patient_id,
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'plan_item_id' => $itemAjuste->id,
+                                'price' => $item_price,
+                                'status' => ServicesStatus::COMPLETADA->value,
+                                'created_at' => now(),
+                            ]);
+                        }
+                    }
+                } elseif ($sessionsDifference < 0) {
+                    // Need to remove consumed sessions
+                    $sessionsToDelete = abs($sessionsDifference);
+
+                    $servicesToDelete = $assignedPlan->patient->acquired_services()
+                        ->whereNotNull('plan_item_id')
+                        ->whereNotNull('assigned_plan_id')
+                        ->whereHas('patient_plan_item', function($query) {
+                            $query->where('type_of_item_id', ItemType::AJUSTE->value);
+                        })
+                        ->where('assigned_plan_id', $assignedPlan->id)
+                        ->orderBy('created_at', 'desc')
+                        ->take($sessionsToDelete)
+                        ->get();
+
+                    foreach ($servicesToDelete as $service) {
+                        $service->forceDelete();
+                    }
+                }
+            }
+
+            // Handle therapies adjustment
+            if ($request->has('consumed_therapies')) {
+                $targetConsumedTherapies = $request->consumed_therapies;
+                $therapiesDifference = $targetConsumedTherapies - $currentConsumedTherapies;
+
+                if ($therapiesDifference > 0) {
+                    // Need to add more consumed therapies
+                    $itemTerapia = Item::where('plan', true)
+                        ->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)
+                        ->first();
+
+                    if ($itemTerapia) {
+                        for ($i = 0; $i < $therapiesDifference; $i++) {
+                            AcquiredService::create([
+                                'patient_id' => $assignedPlan->patient_id,
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'plan_item_id' => $itemTerapia->id,
+                                'price' => $item_price,
+                                'status' => ServicesStatus::COMPLETADA->value,
+                                'created_at' => now(),
+                            ]);
+                        }
+                    }
+                } elseif ($therapiesDifference < 0) {
+                    // Need to remove consumed therapies
+                    $therapiesToDelete = abs($therapiesDifference);
+
+                    $servicesToDelete = $assignedPlan->patient->acquired_services()
+                        ->whereNotNull('plan_item_id')
+                        ->whereNotNull('assigned_plan_id')
+                        ->whereHas('patient_plan_item', function($query) {
+                            $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
+                        })
+                        ->where('assigned_plan_id', $assignedPlan->id)
+                        ->orderBy('created_at', 'desc')
+                        ->take($therapiesToDelete)
+                        ->get();
+
+                    foreach ($servicesToDelete as $service) {
+                        $service->forceDelete();
+                    }
+                }
+            }
+
+            // Update vouchers if amount or consumed items changed
+            if ($request->has('amount') || $request->has('consumed_sessions') || $request->has('consumed_therapies')) {
+                $this->updateVouchers($assignedPlan, $item_price);
+            }
+
+            // Save the assigned plan
+            $assignedPlan->save();
+
+            // Check if plan is completed
+            $assignedPlan->isCompleted();
+
+            DB::commit();
+
+            // Reload with fresh data
+            $assignedPlan->load(['services', 'voucher']);
+
+            // Calculate final counts for response
+            $finalConsumedSessions = $assignedPlan->patient->acquired_services()
+                ->whereNotNull('plan_item_id')
+                ->whereNotNull('assigned_plan_id')
+                ->whereHas('patient_plan_item', function($query) {
+                    $query->where('type_of_item_id', ItemType::AJUSTE->value);
+                })
+                ->where('assigned_plan_id', $assignedPlan->id)
+                ->count();
+
+            $finalConsumedTherapies = $assignedPlan->patient->acquired_services()
+                ->whereNotNull('plan_item_id')
+                ->whereNotNull('assigned_plan_id')
+                ->whereHas('patient_plan_item', function($query) {
+                    $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
+                })
+                ->where('assigned_plan_id', $assignedPlan->id)
+                ->count();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Plan asignado actualizado exitosamente',
+                'data' => [
+                    'assigned_plan_id' => $assignedPlan->id,
+                    'patient_id' => $assignedPlan->patient_id,
+                    'plan_id' => $assignedPlan->plan_id,
+                    'therapies_number' => $assignedPlan->therapies_number,
+                    'total_sessions' => $assignedPlan->total_sessions,
+                    'consumed_therapies' => $finalConsumedTherapies,
+                    'consumed_sessions' => $finalConsumedSessions,
+                    'remaining_therapies' => max(0, $assignedPlan->therapies_number - $finalConsumedTherapies),
+                    'remaining_sessions' => max(0, $assignedPlan->total_sessions - $finalConsumedSessions),
+                    'amount' => $assignedPlan->amount,
+                    'status' => $assignedPlan->status,
+                    'date_start' => $assignedPlan->date_start,
+                    'date_end' => $assignedPlan->date_end,
+                    'item_price' => $item_price,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error actualizando plan asignado: ' . $e->getMessage(), [
+                'assigned_plan_id' => $assignedPlan->id,
+                'patient_id' => $assignedPlan->patient_id,
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar el plan asignado: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update vouchers for the assigned plan based on new consumed amount
+     */
+    private function updateVouchers($assignedPlan, $item_price)
+    {
+        // Get current consumed services count
+        $consumedSessions = $assignedPlan->patient->acquired_services()
+            ->whereNotNull('plan_item_id')
+            ->whereNotNull('assigned_plan_id')
+            ->whereHas('patient_plan_item', function($query) {
+                $query->where('type_of_item_id', ItemType::AJUSTE->value);
+            })
+            ->where('assigned_plan_id', $assignedPlan->id)
+            ->count();
+
+        $consumedTherapies = $assignedPlan->patient->acquired_services()
+            ->whereNotNull('plan_item_id')
+            ->whereNotNull('assigned_plan_id')
+            ->whereHas('patient_plan_item', function($query) {
+                $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
+            })
+            ->where('assigned_plan_id', $assignedPlan->id)
+            ->count();
+
+        $totalConsumedItems = $consumedSessions + $consumedTherapies;
+        $totalConsumedAmount = $totalConsumedItems * $item_price;
+
+        // Delete all existing vouchers
+        Voucher::where('assigned_plan_id', $assignedPlan->id)->delete();
+
+        // Create new vouchers based on consumed amount
+        if ($totalConsumedAmount > 0 && $totalConsumedItems > 0) {
+            for ($i = 0; $i < $totalConsumedItems; $i++) {
+                Voucher::create([
+                    'assigned_plan_id' => $assignedPlan->id,
+                    'status' => 3, // Used status
+                    'quantity' => 1,
+                    'price' => $item_price,
+                    'created_at' => now(),
+                ]);
+            }
+        }
+    }
+
+    /**
      * Determina el ID final que se usará para el paciente basado en las condiciones:
      * - Si el ID existe en Patient y el nombre es diferente, agregar 0 al inicio
      * - Si el nombre del paciente legacy ya existe en la DB, retornar null
