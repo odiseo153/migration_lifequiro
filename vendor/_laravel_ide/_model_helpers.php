@@ -5,6 +5,7 @@ namespace App\Models {
     /**
      * App\Models\AcquiredService
      *
+     * @property mixed $appointment_id
      * @property mixed $assigned_plan_id
      * @property mixed $plan_item_id
      * @property \Illuminate\Support\Carbon|null $deleted_at
@@ -39,6 +40,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<AcquiredService>|AcquiredService whereDeletedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<AcquiredService>|AcquiredService wherePlanItemId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<AcquiredService>|AcquiredService whereAssignedPlanId($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<AcquiredService>|AcquiredService whereAppointmentId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<AcquiredService>|AcquiredService name()
      * @method static \Illuminate\Database\Eloquent\Builder<AcquiredService>|AcquiredService dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<AcquiredService>|AcquiredService newModelQuery()
@@ -19338,6 +19340,7 @@ namespace App\Models {
     /**
      * App\Models\Patient
      *
+     * @property mixed $old_id
      * @property \Illuminate\Support\Carbon|null $deleted_at
      * @property \Illuminate\Support\Carbon|null $updated_at
      * @property \Illuminate\Support\Carbon|null $created_at
@@ -19477,6 +19480,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Patient>|Patient whereCreatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Patient>|Patient whereUpdatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Patient>|Patient whereDeletedAt($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<Patient>|Patient whereOldId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Patient>|Patient patientType()
      * @method static \Illuminate\Database\Eloquent\Builder<Patient>|Patient name()
      * @method static \Illuminate\Database\Eloquent\Builder<Patient>|Patient dateRange()

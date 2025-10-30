@@ -164,9 +164,9 @@ class MigratePatients extends BaseCommand
                     ]);
                     $this->info('Insertados/actualizados '.count($patientsToInsert).' pacientes');
 
-                    // Solo insertar citas después de que los pacientes se hayan insertado exitosamente
-                    if (! empty($appointmentsToInsert)) {
-                        // Verificar que todos los pacientes de las citas existen en la base de datos
+// Solo insertar citas después de que los pacientes se hayan insertado exitosamente
+if (! empty($appointmentsToInsert)) {
+    // Verificar que todos los pacientes de las citas existen en la base de datos
                         $appointmentPatientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
                         $existingPatientIds = Patient::whereIn('id', $appointmentPatientIds)->pluck('id')->toArray();
 
