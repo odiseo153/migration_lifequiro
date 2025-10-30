@@ -2,42 +2,42 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\AppointmentStatus;
-use App\Enums\AppointmentType;
-use App\Enums\ItemType;
-use App\Enums\PaymentMethodType;
-use App\Enums\PlanStatus;
-use App\Enums\ServicesStatus;
-use App\Models\AcquiredService;
-use App\Models\Appointment;
-use App\Models\AssignedPlan;
 use App\Models\Bed;
-use App\Models\CreditNote;
-use App\Models\DescuentAuthorization;
 use App\Models\Item;
-use App\Models\Legacy\Ajuste;
-use App\Models\Legacy\Antecedente;
-use App\Models\Legacy\Balance;
-use App\Models\Legacy\Cita;
-use App\Models\Legacy\Compra;
-use App\Models\Legacy\HistorialAjuste;
-use App\Models\Legacy\HistorialTerapia;
-use App\Models\Legacy\Paciente;
-use App\Models\MedicalAjusteModule;
-use App\Models\MedicalRecord;
-use App\Models\MedicalTerapiaTracionModule;
-use App\Models\Patient;
-use App\Models\PatientGroup;
-use App\Models\PatientItem;
-use App\Models\PhysicalTherapyCategory;
 use App\Models\Plan;
 use App\Models\Room;
 use App\Models\User;
+use App\Enums\ItemType;
+use App\Models\Patient;
 use App\Models\Voucher;
+use App\Enums\PlanStatus;
+use App\Models\CreditNote;
+use App\Models\Appointment;
+use App\Models\PatientItem;
+use App\Models\AssignedPlan;
+use App\Models\PatientGroup;
 use App\Models\WhereHeMetUs;
 use Illuminate\Http\Request;
+use App\Enums\ServicesStatus;
+use App\Models\Legacy\Ajuste;
+use App\Models\Legacy\Compra;
+use App\Models\MedicalRecord;
+use App\Enums\AppointmentType;
+use App\Models\Legacy\Balance;
+use App\Models\AcquiredService;
+use App\Models\Legacy\Paciente;
+use App\Enums\AppointmentStatus;
+use App\Enums\PaymentMethodType;
+use App\Models\Legacy\Antecedente;
+use App\Models\TypeOfAppointments;
 use Illuminate\Support\Facades\DB;
+use App\Models\MedicalAjusteModule;
 use Illuminate\Support\Facades\Log;
+use App\Models\DescuentAuthorization;
+use App\Models\Legacy\HistorialAjuste;
+use App\Models\Legacy\HistorialTerapia;
+use App\Models\PhysicalTherapyCategory;
+use App\Models\MedicalTerapiaTracionModule;
 
 class MigrationController extends Controller
 {
@@ -149,10 +149,10 @@ class MigrationController extends Controller
         // OPTIMIZACIÓN: Consulta más eficiente para últimas citas - USANDO CONEXIÓN LEGACY
         $lastAppointments = DB::connection('legacy')->table('cita as c1')
             ->select('c1.paciente_id', 'c1.tipo', 'c1.estado_id', 'c1.hora', 'c1.dia', 'c1.fecha')
-            ->leftJoin('cita as c2', function($join) {
+            ->leftJoin('cita as c2', function ($join) {
                 $join->on('c1.paciente_id', '=', 'c2.paciente_id')
-                     ->on('c1.id', '<', 'c2.id')
-                     ->where('c2.estado_id', AppointmentStatus::COMPLETADA->value);
+                    ->on('c1.id', '<', 'c2.id')
+                    ->where('c2.estado_id', AppointmentStatus::COMPLETADA->value);
             })
             ->where('c1.estado_id', AppointmentStatus::COMPLETADA->value)
             ->whereIn('c1.paciente_id', $patientIds)
@@ -167,7 +167,7 @@ class MigrationController extends Controller
         $existingPatientIds = Patient::whereIn('id', $patientIds)->pluck('id')->toArray();
         $existingPatientsByName = Patient::select('id', 'first_name', 'last_name')
             ->get()
-            ->mapWithKeys(function($patient) {
+            ->mapWithKeys(function ($patient) {
                 $fullName = strtolower(trim($patient->first_name . ' ' . $patient->last_name));
                 return [$fullName => $patient->id];
             });
@@ -280,9 +280,23 @@ class MigrationController extends Controller
 
             foreach ($patientChunks as $chunk) {
                 Patient::upsert($chunk, ['id'], [
-                    'email', 'identity_document', 'first_name', 'last_name', 'birth_date',
-                    'mobile', 'phone', 'token', 'gender', 'civil_status', 'address',
-                    'occupation', 'comment', 'branch_id', 'patient_group_id', 'where_met_us_id', 'updated_at'
+                    'email',
+                    'identity_document',
+                    'first_name',
+                    'last_name',
+                    'birth_date',
+                    'mobile',
+                    'phone',
+                    'token',
+                    'gender',
+                    'civil_status',
+                    'address',
+                    'occupation',
+                    'comment',
+                    'branch_id',
+                    'patient_group_id',
+                    'where_met_us_id',
+                    'updated_at'
                 ]);
             }
             $results['migrated_patients'] += count($patientsToInsert);
@@ -824,7 +838,7 @@ class MigrationController extends Controller
             }
 
             if (is_string($timestamp) && ctype_digit(trim($timestamp))) {
-                return \Carbon\Carbon::createFromTimestamp((int)$timestamp)->format('Y-m-d H:i:s');
+                return \Carbon\Carbon::createFromTimestamp((int) $timestamp)->format('Y-m-d H:i:s');
             }
 
             if (is_string($timestamp)) {
@@ -851,7 +865,7 @@ class MigrationController extends Controller
             }
 
             if (is_string($timestamp) && preg_match('/^-?\d{1,4}-/', $timestamp)) {
-                $year = (int)substr($timestamp, 0, strpos($timestamp, '-', 1));
+                $year = (int) substr($timestamp, 0, strpos($timestamp, '-', 1));
                 if ($year <= 0) {
                     return now();
                 }
@@ -874,7 +888,7 @@ class MigrationController extends Controller
             }
 
             if (is_numeric($timestamp)) {
-                $timestampInt = (int)$timestamp;
+                $timestampInt = (int) $timestamp;
                 if ($timestampInt >= 0 && $timestampInt <= 4102444800) {
                     return \Carbon\Carbon::createFromTimestamp($timestampInt);
                 }
@@ -1017,7 +1031,7 @@ class MigrationController extends Controller
             $currentConsumedSessions = $assignedPlan->patient->acquired_services()
                 ->whereNotNull('plan_item_id')
                 ->whereNotNull('assigned_plan_id')
-                ->whereHas('patient_plan_item', function($query) {
+                ->whereHas('patient_plan_item', function ($query) {
                     $query->where('type_of_item_id', ItemType::AJUSTE->value);
                 })
                 ->where('assigned_plan_id', $assignedPlan->id)
@@ -1026,7 +1040,7 @@ class MigrationController extends Controller
             $currentConsumedTherapies = $assignedPlan->patient->acquired_services()
                 ->whereNotNull('plan_item_id')
                 ->whereNotNull('assigned_plan_id')
-                ->whereHas('patient_plan_item', function($query) {
+                ->whereHas('patient_plan_item', function ($query) {
                     $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
                 })
                 ->where('assigned_plan_id', $assignedPlan->id)
@@ -1088,7 +1102,7 @@ class MigrationController extends Controller
                     $servicesToDelete = $assignedPlan->patient->acquired_services()
                         ->whereNotNull('plan_item_id')
                         ->whereNotNull('assigned_plan_id')
-                        ->whereHas('patient_plan_item', function($query) {
+                        ->whereHas('patient_plan_item', function ($query) {
                             $query->where('type_of_item_id', ItemType::AJUSTE->value);
                         })
                         ->where('assigned_plan_id', $assignedPlan->id)
@@ -1132,7 +1146,7 @@ class MigrationController extends Controller
                     $servicesToDelete = $assignedPlan->patient->acquired_services()
                         ->whereNotNull('plan_item_id')
                         ->whereNotNull('assigned_plan_id')
-                        ->whereHas('patient_plan_item', function($query) {
+                        ->whereHas('patient_plan_item', function ($query) {
                             $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
                         })
                         ->where('assigned_plan_id', $assignedPlan->id)
@@ -1166,7 +1180,7 @@ class MigrationController extends Controller
             $finalConsumedSessions = $assignedPlan->patient->acquired_services()
                 ->whereNotNull('plan_item_id')
                 ->whereNotNull('assigned_plan_id')
-                ->whereHas('patient_plan_item', function($query) {
+                ->whereHas('patient_plan_item', function ($query) {
                     $query->where('type_of_item_id', ItemType::AJUSTE->value);
                 })
                 ->where('assigned_plan_id', $assignedPlan->id)
@@ -1175,7 +1189,7 @@ class MigrationController extends Controller
             $finalConsumedTherapies = $assignedPlan->patient->acquired_services()
                 ->whereNotNull('plan_item_id')
                 ->whereNotNull('assigned_plan_id')
-                ->whereHas('patient_plan_item', function($query) {
+                ->whereHas('patient_plan_item', function ($query) {
                     $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
                 })
                 ->where('assigned_plan_id', $assignedPlan->id)
@@ -1218,6 +1232,42 @@ class MigrationController extends Controller
         }
     }
 
+    public function changeTypeOfPatient(Request $request)
+    {
+        $request->validate([
+            'patient_id' => 'required|integer|exists:patients,id',
+            'type' => 'required|integer|exists:type_of_appointments,id|in:1,2,3,4',
+        ]);
+
+        $patient = Patient::find($request->patient_id);
+
+        $TypeAppointment = $request->type != 1 ? $request->type - 1 : AppointmentType::CONSULTA->value;
+
+        if ($patient->appointments()->latest()->where('type_of_appointment_id', $TypeAppointment)->where('status_id', AppointmentStatus::COMPLETADA->value)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La ultima cita del paciente es de este tipo'
+            ], 400);
+        }
+
+        Appointment::create([
+            'note' => 'Cita de migración agregada manualmente',
+            'patient_id' => $patient->id,
+            'branch_id' => $patient->branch_id,
+            'type_of_appointment_id' => $TypeAppointment,
+            'status_id' => AppointmentStatus::COMPLETADA->value,
+            'date' => now()->format('Y-m-d'),
+            'hour' => now()->format('H:i:s'),
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tipo de paciente cambiado exitosamente, ahora es de tipo ' . TypeOfAppointments::find($TypeAppointment + 1)->name
+        ], 200);
+
+    }
+
     /**
      * Update vouchers for the assigned plan based on new consumed amount
      */
@@ -1227,7 +1277,7 @@ class MigrationController extends Controller
         $consumedSessions = $assignedPlan->patient->acquired_services()
             ->whereNotNull('plan_item_id')
             ->whereNotNull('assigned_plan_id')
-            ->whereHas('patient_plan_item', function($query) {
+            ->whereHas('patient_plan_item', function ($query) {
                 $query->where('type_of_item_id', ItemType::AJUSTE->value);
             })
             ->where('assigned_plan_id', $assignedPlan->id)
@@ -1236,7 +1286,7 @@ class MigrationController extends Controller
         $consumedTherapies = $assignedPlan->patient->acquired_services()
             ->whereNotNull('plan_item_id')
             ->whereNotNull('assigned_plan_id')
-            ->whereHas('patient_plan_item', function($query) {
+            ->whereHas('patient_plan_item', function ($query) {
                 $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
             })
             ->where('assigned_plan_id', $assignedPlan->id)
@@ -1274,9 +1324,9 @@ class MigrationController extends Controller
         $legacyFullName = trim(($legacyPatient->nombre ?? '') . ' ' . ($legacyPatient->apellido ?? ''));
 
         // Verificar si ya existe un paciente con el mismo nombre completo en la DB
-        $existingPatientByName = Patient::where(function($query) use ($legacyPatient) {
+        $existingPatientByName = Patient::where(function ($query) use ($legacyPatient) {
             $query->where('first_name', $legacyPatient->nombre ?? '')
-                  ->where('last_name', $legacyPatient->apellido ?? '');
+                ->where('last_name', $legacyPatient->apellido ?? '');
         })->first();
 
         if ($existingPatientByName) {
