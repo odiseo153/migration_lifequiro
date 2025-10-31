@@ -42,7 +42,7 @@ class MigrateCompras extends BaseCommand
             9 => ItemType::TERAPIA_FISICA->value,
         ];
         $patientIds = Patient::
-        where('branch_id',5)
+        where('branch_id',6)
        ->pluck('id')->toArray();
 
         \DB::transaction(function() use ($comprasTipo, $patientIds) {
@@ -50,7 +50,6 @@ class MigrateCompras extends BaseCommand
             where('estado', 1)
             ->where('tipo_servicio','!=', 0)
             ->whereIn('paciente_id', $patientIds)
-            ->whereNotIn('id', PatientItem::pluck('id')->toArray())
                 ->chunk(500, function ($pacientes) use ($comprasTipo) {
                     foreach ($pacientes as $p) {
                         if (!Patient::find($p->paciente_id)) {

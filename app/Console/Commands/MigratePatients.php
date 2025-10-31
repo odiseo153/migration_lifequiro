@@ -51,74 +51,74 @@ class MigratePatients extends BaseCommand
             ->keyBy('paciente_id');
 
         Paciente::whereNotIn('id', Patient::pluck('id')->toArray())->
-        chunk(500, function ($pacientes) use ($whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
-            DB::transaction(function () use ($pacientes, $whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
-                $patientsToInsert = [];
-                $appointmentsToInsert = [];
+            chunk(500, function ($pacientes) use ($whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
+                DB::transaction(function () use ($pacientes, $whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
+                    $patientsToInsert = [];
+                    $appointmentsToInsert = [];
 
-                foreach ($pacientes as $p) {
-                    $branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
-                    try {
+                    foreach ($pacientes as $p) {
+                        $branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
+                        try {
 
-                        $where_met_us_id = null;
-                        $is_refencia_acceptable = $p->referencia != '--' && $p->referencia != '';
+                            $where_met_us_id = null;
+                            $is_refencia_acceptable = $p->referencia != '--' && $p->referencia != '';
 
-                        if ($is_refencia_acceptable) {
-                            $referencia = strtolower(trim($p->referencia));
-                            $bestScore = 0;
-                            $bestMatchId = null;
+                            if ($is_refencia_acceptable) {
+                                $referencia = strtolower(trim($p->referencia));
+                                $bestScore = 0;
+                                $bestMatchId = null;
 
-                            foreach ($whereHeMetUsOptions as $match) {
-                                similar_text($referencia, strtolower($match->name), $percent);
-                                if ($percent > $bestScore) {
-                                    $bestScore = $percent;
-                                    $bestMatchId = $match->id;
+                                foreach ($whereHeMetUsOptions as $match) {
+                                    similar_text($referencia, strtolower($match->name), $percent);
+                                    if ($percent > $bestScore) {
+                                        $bestScore = $percent;
+                                        $bestMatchId = $match->id;
+                                    }
+                                }
+
+                                if ($bestScore >= 60) {
+                                    $where_met_us_id = $bestMatchId;
                                 }
                             }
 
-                            if ($bestScore >= 60) {
-                                $where_met_us_id = $bestMatchId;
-                            }
-                        }
+                            // Preparar datos del paciente para inserción batch
+                            $patientData = [
+                                'id' => $p->id,
+                                'email' => $p->correo,
+                                'identity_document' => $p->cedula_no == '' ? null : $p->cedula_no,
+                                'first_name' => $p->nombre ?? 'sin nombre',
+                                'last_name' => $p->apellido ?? 'sin apellido',
+                                'birth_date' => $this->parseDate($p->fecha_nacimiento),
+                                'mobile' => $p->celular ?? '',
+                                'phone' => $p->telefono ?? '',
+                                'token' => rand(1000, 9999),
+                                'gender' => $this->mapSexo($p->sexo),
+                                'civil_status' => $p->estado_civil,
+                                'address' => $p->direccion ?? '',
+                                'occupation' => $p->ocupacion ?? '',
+                                'comment' => $p->comentario ?? '',
+                                'branch_id' => $branch_id,
+                                'patient_group_id' => $patientGroups->has($p->grupo) ? $p->grupo : 1,
+                                'where_met_us_id' => $where_met_us_id ?? 1,
+                                'created_at' => $p->fecha == null ? now() : $this->parseDateInt($p->fecha),
+                                'updated_at' => now(),
+                            ];
 
-                        // Preparar datos del paciente para inserción batch
-                        $patientData = [
-                            'id' => $p->id,
-                            'email' => $p->correo,
-                            'identity_document' => $p->cedula_no == '' ? null : $p->cedula_no,
-                            'first_name' => $p->nombre ?? 'sin nombre',
-                            'last_name' => $p->apellido ?? 'sin apellido',
-                            'birth_date' => $this->parseDate($p->fecha_nacimiento),
-                            'mobile' => $p->celular ?? '',
-                            'phone' => $p->telefono ?? '',
-                            'token' => rand(1000, 9999),
-                            'gender' => $this->mapSexo($p->sexo),
-                            'civil_status' => $p->estado_civil,
-                            'address' => $p->direccion ?? '',
-                            'occupation' => $p->ocupacion ?? '',
-                            'comment' => $p->comentario ?? '',
-                            'branch_id' => $branch_id,
-                            'patient_group_id' => $patientGroups->has($p->grupo) ? $p->grupo : 1,
-                            'where_met_us_id' => $where_met_us_id ?? 1,
-                            'created_at' => $p->fecha == null ? now() : $this->parseDateInt($p->fecha),
-                            'updated_at' => now(),
-                        ];
+                            $patientsToInsert[] = $patientData;
 
-                        $patientsToInsert[] = $patientData;
+                            // Si existe última cita para este paciente, preparar datos de cita
+                            if (isset($lastAppointments[$p->id])) {
+                                $last_appointment_old = $lastAppointments[$p->id];
 
-                        // Si existe última cita para este paciente, preparar datos de cita
-                        if (isset($lastAppointments[$p->id])) {
-                            $last_appointment_old = $lastAppointments[$p->id];
+                                try {
+                                    $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $last_appointment_old->hora)->format('H:i:s');
+                                } catch (\Exception $e) {
+                                    $hourFormatted = '09:00:00'; // Hora por defecto si falla el parsing
+                                }
 
-                            try {
-                                $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $last_appointment_old->hora)->format('H:i:s');
-                            } catch (\Exception $e) {
-                                $hourFormatted = '09:00:00'; // Hora por defecto si falla el parsing
-                            }
-
-                            $TypeAppointment = $last_appointment_old->tipo > 8 ?
-                                AppointmentType::MIP->value :
-                                ($CitaTipoOld[$last_appointment_old->tipo] ?? AppointmentType::MIP->value);
+                                $TypeAppointment = $last_appointment_old->tipo > 8 ?
+                                    AppointmentType::MIP->value :
+                                    ($CitaTipoOld[$last_appointment_old->tipo] ?? AppointmentType::MIP->value);
 
 
                                 $appointmentData = [
@@ -133,80 +133,80 @@ class MigratePatients extends BaseCommand
                                     'updated_at' => now(),
                                 ];
 
-                            $appointmentsToInsert[] = $appointmentData;
-                        }
+                                $appointmentsToInsert[] = $appointmentData;
+                            }
 
-                    } catch (\Exception $e) {
-                        continue;
-                    }
-                }
-
-                // Inserción batch de pacientes
-                if (! empty($patientsToInsert)) {
-                    Patient::upsert($patientsToInsert, ['id'], [
-                        'email',
-                        'identity_document',
-                        'first_name',
-                        'last_name',
-                        'birth_date',
-                        'mobile',
-                        'phone',
-                        'token',
-                        'gender',
-                        'civil_status',
-                        'address',
-                        'occupation',
-                        'comment',
-                        'branch_id',
-                        'patient_group_id',
-                        'where_met_us_id',
-                        'updated_at',
-                    ]);
-                    $this->info('Insertados/actualizados '.count($patientsToInsert).' pacientes');
-
-// Solo insertar citas después de que los pacientes se hayan insertado exitosamente
-if (! empty($appointmentsToInsert)) {
-    // Verificar que todos los pacientes de las citas existen en la base de datos
-                        $appointmentPatientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
-                        $existingPatientIds = Patient::whereIn('id', $appointmentPatientIds)->pluck('id')->toArray();
-
-                        $validAppointments = collect($appointmentsToInsert)->filter(function ($appointment) use ($existingPatientIds) {
-                            return in_array($appointment['patient_id'], $existingPatientIds);
-                        })->toArray();
-
-                        if (! empty($validAppointments)) {
-                            Appointment::insert($validAppointments);
-                            $this->info('Insertadas '.count($validAppointments).' citas');
-                        }
-
-                        $skippedAppointments = count($appointmentsToInsert) - count($validAppointments);
-                        if ($skippedAppointments > 0) {
-                            $this->warn("Se omitieron {$skippedAppointments} citas por pacientes inexistentes");
+                        } catch (\Exception $e) {
+                            continue;
                         }
                     }
-                } else {
-                    // Si no hay pacientes para insertar, verificar que las citas tengan pacientes válidos
-                    if (! empty($appointmentsToInsert)) {
-                        $patientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
-                        $existingPatients = Patient::whereIn('id', $patientIds)->pluck('id')->toArray();
 
-                        $validAppointments = collect($appointmentsToInsert)->filter(function ($appointment) use ($existingPatients) {
-                            return in_array($appointment['patient_id'], $existingPatients);
-                        })->toArray();
+                    // Inserción batch de pacientes
+                    if (!empty($patientsToInsert)) {
+                        Patient::upsert($patientsToInsert, ['id'], [
+                            'email',
+                            'identity_document',
+                            'first_name',
+                            'last_name',
+                            'birth_date',
+                            'mobile',
+                            'phone',
+                            'token',
+                            'gender',
+                            'civil_status',
+                            'address',
+                            'occupation',
+                            'comment',
+                            'branch_id',
+                            'patient_group_id',
+                            'where_met_us_id',
+                            'updated_at',
+                        ]);
+                        $this->info('Insertados/actualizados ' . count($patientsToInsert) . ' pacientes');
 
-                        if (! empty($validAppointments)) {
-                            Appointment::insert($validAppointments);
-                            $this->info('Insertadas '.count($validAppointments).' citas');
+                        // Solo insertar citas después de que los pacientes se hayan insertado exitosamente
+                        if (!empty($appointmentsToInsert)) {
+                            // Verificar que todos los pacientes de las citas existen en la base de datos
+                            $appointmentPatientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
+                            $existingPatientIds = Patient::whereIn('id', $appointmentPatientIds)->pluck('id')->toArray();
+
+                            $validAppointments = collect($appointmentsToInsert)->filter(function ($appointment) use ($existingPatientIds) {
+                                return in_array($appointment['patient_id'], $existingPatientIds);
+                            })->toArray();
+
+                            if (!empty($validAppointments)) {
+                                Appointment::insert($validAppointments);
+                                $this->info('Insertadas ' . count($validAppointments) . ' citas');
+                            }
+
+                            $skippedAppointments = count($appointmentsToInsert) - count($validAppointments);
+                            if ($skippedAppointments > 0) {
+                                $this->warn("Se omitieron {$skippedAppointments} citas por pacientes inexistentes");
+                            }
                         }
+                    } else {
+                        // Si no hay pacientes para insertar, verificar que las citas tengan pacientes válidos
+                        if (!empty($appointmentsToInsert)) {
+                            $patientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
+                            $existingPatients = Patient::whereIn('id', $patientIds)->pluck('id')->toArray();
 
-                        $skippedAppointments = count($appointmentsToInsert) - count($validAppointments);
-                        if ($skippedAppointments > 0) {
-                            $this->warn("Se omitieron {$skippedAppointments} citas por pacientes inexistentes");
+                            $validAppointments = collect($appointmentsToInsert)->filter(function ($appointment) use ($existingPatients) {
+                                return in_array($appointment['patient_id'], $existingPatients);
+                            })->toArray();
+
+                            if (!empty($validAppointments)) {
+                                Appointment::insert($validAppointments);
+                                $this->info('Insertadas ' . count($validAppointments) . ' citas');
+                            }
+
+                            $skippedAppointments = count($appointmentsToInsert) - count($validAppointments);
+                            if ($skippedAppointments > 0) {
+                                $this->warn("Se omitieron {$skippedAppointments} citas por pacientes inexistentes");
+                            }
                         }
                     }
-                }
+                });
             });
-        });
 
         $this->info('Migración de pacientes completada.');
     }
