@@ -50,6 +50,7 @@ class MigrateCompras extends BaseCommand
             where('estado', 1)
             ->where('tipo_servicio','!=', 0)
             ->whereIn('paciente_id', $patientIds)
+            ->whereNotIn('id', PatientItem::pluck('id')->toArray())
                 ->chunk(500, function ($pacientes) use ($comprasTipo) {
                     foreach ($pacientes as $p) {
                         if (!Patient::find($p->paciente_id)) {
@@ -82,6 +83,6 @@ class MigrateCompras extends BaseCommand
                 });
         });
 
-        $this->info("Migración de comprascompletada.");
+        $this->info("Migración de compras completada.");
     }
 }

@@ -30,7 +30,7 @@ class MigrateAll extends Command
        // $this->call('migrate:usuarios');
       //  $this->call('migrate:usuarios-centros');
         $this->call('migrate:patients');//
-        $this->call('migrate:planes');
+      //  $this->call('migrate:planes');
         $this->call('migrate:planes-asignados');//
         $this->call('migrate:citas-programadas');
         $this->call('migrate:compras');//

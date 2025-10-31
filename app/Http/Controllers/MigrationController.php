@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Bed;
 use App\Models\Item;
 use App\Models\Plan;
+use App\Models\Role;
 use App\Models\Room;
 use App\Models\User;
 use App\Enums\ItemType;
@@ -28,6 +29,7 @@ use App\Models\AcquiredService;
 use App\Models\Legacy\Paciente;
 use App\Enums\AppointmentStatus;
 use App\Enums\PaymentMethodType;
+use App\Enums\AuthorizationStatus;
 use App\Models\Legacy\Antecedente;
 use App\Models\TypeOfAppointments;
 use Illuminate\Support\Facades\DB;
@@ -1007,6 +1009,12 @@ class MigrationController extends Controller
             'amount' => 'nullable|numeric|min:0',
             'date_start' => 'nullable|date',
             'date_end' => 'nullable|date|after_or_equal:date_start',
+
+            //nuevos
+            'consume' => 'nullable|numeric|min:0',
+            'balance' => 'nullable|numeric|min:0',
+            'paid' => 'nullable|numeric|min:0',
+            'descuent' => 'nullable|numeric|min:0',
         ]);
 
         try {
@@ -1026,7 +1034,6 @@ class MigrationController extends Controller
             // Store original values for comparison
             $originalTherapiesNumber = $assignedPlan->therapies_number;
             $originalTotalSessions = $assignedPlan->total_sessions;
-
             // Get current consumed counts
             $currentConsumedSessions = $assignedPlan->patient->acquired_services()
                 ->whereNotNull('plan_item_id')
@@ -1055,7 +1062,6 @@ class MigrationController extends Controller
                 $assignedPlan->total_sessions = $request->total_sessions;
             }
 
-
             if ($request->has('amount')) {
                 $assignedPlan->amount = $request->amount;
             }
@@ -1066,6 +1072,32 @@ class MigrationController extends Controller
 
             if ($request->has('date_end')) {
                 $assignedPlan->date_end = $request->date_end;
+            }
+
+            if ($request->has('consume')) {
+                $this->updatePlanConsume($assignedPlan, $request->consume);
+            }
+
+            if ($request->has('balance')) {
+                $this->updatePlanBalance($assignedPlan, $request->balance);
+            }
+
+            if ($request->has('descuent')) {
+              //  $descuents = $assignedPlan->descuentAuthorizations()->whereIn('status', [AuthorizationStatus::AUTORIZADO->value, AuthorizationStatus::APROBADO->value])->get();
+
+                $user = Role::find(1)->users()->first();
+
+                DescuentAuthorization::create([
+                    'patient_id' => $assignedPlan->patient_id,
+                    'assigned_plan_id' => $assignedPlan->id,
+                    'type' => 1,
+                    'request_amount' => $request->descuent,
+                    'approved_amount' => $request->descuent,
+                    'status' => AuthorizationStatus::AUTORIZADO->value,
+                    'request_by' => $user->id,
+                    'authorized_by' => $user->id,
+                    'authorized_at' => now(),
+                ]);
             }
 
             // Calculate new item price based on updated values
@@ -1296,7 +1328,7 @@ class MigrationController extends Controller
         $totalConsumedAmount = $totalConsumedItems * $item_price;
 
         // Delete all existing vouchers
-        Voucher::where('assigned_plan_id', $assignedPlan->id)->delete();
+        Voucher::where('assigned_plan_id', $assignedPlan->id)->forceDelete();
 
         // Create new vouchers based on consumed amount
         if ($totalConsumedAmount > 0 && $totalConsumedItems > 0) {
@@ -1310,6 +1342,49 @@ class MigrationController extends Controller
                 ]);
             }
         }
+    }
+
+    private function updatePlanConsume($assignedPlan, $consume)
+    {
+        $total_items = $assignedPlan->total_sessions + $assignedPlan->therapies_number;
+        $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
+        $total_consumed_items = (int) $assignedPlan->total_sessions + (int) $assignedPlan->therapies_number;
+
+        // Crear vouchers para que count(vouchers) * $item_price = $p->consumido
+        if ($consume > 0 && $item_price > 0) {
+            Voucher::where('assigned_plan_id', $assignedPlan->id)->forceDelete();
+            // Calcular cuántos vouchers necesitamos: consumido / precio_por_item
+            $vouchers_needed = round($consume / $item_price);
+
+            // Asegurar que no creamos más vouchers de los que realmente se consumieron
+            $vouchers_needed = min($vouchers_needed, $total_consumed_items);
+
+            for ($i = 0; $i < $vouchers_needed; $i++) {
+                Voucher::create([
+                    'assigned_plan_id' => $assignedPlan->id,
+                    'status' => 3,
+                    'quantity' => 1,
+                    'price' => $item_price,
+                ]);
+            }
+        } elseif ($consume > 0 && $total_consumed_items > 0) {
+            // Si item_price es 0 pero hay consumo, crear vouchers con el precio unitario del consumo
+            $price_per_voucher = $consume / $total_consumed_items;
+
+            for ($i = 0; $i < $total_consumed_items; $i++) {
+                Voucher::create([
+                    'assigned_plan_id' => $assignedPlan->id,
+                    'status' => 3,
+                    'quantity' => 1,
+                    'price' => $price_per_voucher,
+                ]);
+            }
+        }
+    }
+
+    private function updatePlanBalance($assignedPlan, $balance)
+    {
+
     }
 
     /**

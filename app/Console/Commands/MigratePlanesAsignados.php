@@ -58,6 +58,7 @@ class MigratePlanesAsignados extends BaseCommand
                             'paid_type' => 1,
                             'amount' => $p->costo,
                             'therapies_number' => $p->terapias_fisicas,
+                            'total_sessions' => $p->sesiones_utilizadas,
                             'number_installments' => Plan::find($p->plan_id)->number_installments ?? 0,
                             'status' => $planStatusMatch[$p->estado],
                             'branch_id' => $p->centro_id,
@@ -96,7 +97,7 @@ class MigratePlanesAsignados extends BaseCommand
                     }
 
                     // Calcular precio por ítem como en la función find()
-                    $total_items = $assignedPlan->plan->total_sessions + $assignedPlan->therapies_number;
+                    $total_items = $assignedPlan->total_sessions + $assignedPlan->therapies_number;
                     $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
 
                     // Calcular cuántos vouchers necesitamos crear para que el consumo sea igual a $p->consumido
