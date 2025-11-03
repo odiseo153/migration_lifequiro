@@ -27,7 +27,7 @@ class MigratePlanesAsignados extends BaseCommand
         $this->info("Iniciando migración de planes asignados...");
 
         Ajuste::
-        whereIn('paciente_id', Patient::whereDoesntHave('assignedPlans')->pluck('id')->toArray())
+        whereIn('paciente_id', Patient::whereDoesntHave('assigned_plan')->pluck('id')->toArray())
         ->whereIn('plan_id', Plan::whereNotIn('id', $this->ignored_plan)->pluck('id')->toArray())
         ->chunk(500, function ($pacientes) {
             $user = User::first();
