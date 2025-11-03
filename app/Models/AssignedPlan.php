@@ -16,6 +16,7 @@ class AssignedPlan extends BaseModel
         'paid_type',
         'amount',
         'therapies_number',
+        'total_sessions',
         'number_installments',
         'status',
         'branch_id',

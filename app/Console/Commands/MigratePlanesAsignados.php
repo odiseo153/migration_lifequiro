@@ -41,7 +41,6 @@ class MigratePlanesAsignados extends BaseCommand
                         4 => PlanStatus::Desactivado->value,
                     ];
 
-
                     if (!Plan::find($p->plan_id)) {
                         $this->warn("Plan no encontrado - ID: {$p->plan_id}. Omitiendo registro.");
                         continue;
@@ -58,7 +57,7 @@ class MigratePlanesAsignados extends BaseCommand
                             'paid_type' => 1,
                             'amount' => $p->costo,
                             'therapies_number' => $p->terapias_fisicas,
-                            'total_sessions' => $p->sesiones_utilizadas,
+                            'total_sessions' => $p->ajustes,
                             'number_installments' => Plan::find($p->plan_id)->number_installments ?? 0,
                             'status' => $planStatusMatch[$p->estado],
                             'branch_id' => $p->centro_id,
@@ -214,7 +213,7 @@ class MigratePlanesAsignados extends BaseCommand
             }
         });
 
-        $this->info("Migración completada.");
+        $this->info("Migración de planes asignados completada.");
     }
 
 

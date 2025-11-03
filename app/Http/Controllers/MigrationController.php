@@ -1264,6 +1264,185 @@ class MigrationController extends Controller
         }
     }
 
+    public function updateAssignedPlansFromLegacy(Request $request)
+    {
+        ini_set('memory_limit', '2G');
+        ini_set('max_execution_time', 1000);
+
+        $request->validate([
+            'patient_ids' => 'array',
+            'patient_ids.*' => 'integer',
+            'assigned_plan_ids' => 'array',
+            'assigned_plan_ids.*' => 'integer',
+            'branch_ids' => 'array',
+            'branch_ids.*' => 'integer',
+            'check_all' => 'boolean'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $results = [
+                'success' => true,
+                'checked_plans' => 0,
+                'updated_plans' => 0,
+                'differences_found' => [],
+                'errors' => []
+            ];
+
+            // Determinar qué planes revisar
+            if ($request->has('assigned_plan_ids') && !empty($request->assigned_plan_ids)) {
+                // Revisar planes específicos
+                $assignedPlans = AssignedPlan::whereIn('id', $request->assigned_plan_ids)->get();
+            } elseif ($request->has('patient_ids') && !empty($request->patient_ids)) {
+                // Revisar planes de pacientes específicos
+                $assignedPlans = AssignedPlan::whereIn('patient_id', $request->patient_ids)->get();
+            } elseif ($request->has('branch_ids') && !empty($request->branch_ids)) {
+                // Revisar planes de pacientes por branch_id
+                $assignedPlans = AssignedPlan::whereHas('patient', function($query) use ($request) {
+                    $query->whereIn('branch_id', $request->branch_ids);
+                })->get();
+            } elseif ($request->check_all) {
+                // Revisar todos los planes (con límite de seguridad)
+                $assignedPlans = AssignedPlan::limit(1000)->get();
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Debe especificar patient_ids, assigned_plan_ids, branch_ids o check_all=true'
+                ], 400);
+            }
+
+            foreach ($assignedPlans as $assignedPlan) {
+                try {
+                    $results['checked_plans']++;
+
+                    // Buscar el plan en la base de datos legacy
+                    $legacyPlan = Ajuste::where('id', $assignedPlan->id)->first();
+
+                    if (!$legacyPlan) {
+                        $results['errors'][] = "Plan asignado {$assignedPlan->id} no encontrado en base de datos legacy";
+                        continue;
+                    }
+
+                    $differences = [];
+                    $needsUpdate = false;
+
+                    // Comparar total_sessions (viene del plan actual)
+                    $currentTotalSessions = $assignedPlan->total_sessions ?? 0;
+                    $legacyTotalSessions = $legacyPlan->ajustes ?? 0; // En legacy viene del plan también
+
+                    // Comparar therapies_number
+                    $currentTherapiesNumber = $assignedPlan->therapies_number ?? 0;
+                    $legacyTherapiesNumber = $legacyPlan->terapias_fisicas ?? 0;
+
+                    if ($currentTherapiesNumber != $legacyTherapiesNumber) {
+                        $differences['therapies_number'] = [
+                            'current' => $currentTherapiesNumber,
+                            'legacy' => $legacyTherapiesNumber
+                        ];
+                        $needsUpdate = true;
+                    }
+
+                    if ($currentTotalSessions != $legacyTotalSessions) {
+                        $differences['total_sessions'] = [
+                            'current' => $currentTotalSessions,
+                            'legacy' => $legacyTotalSessions
+                        ];
+                        $needsUpdate = true;
+                    }
+
+                    // Comparar otros campos importantes
+                    $currentAmount = $assignedPlan->amount ?? 0;
+                    $legacyAmount = $legacyPlan->costo ?? 0;
+
+                    if (abs($currentAmount - $legacyAmount) > 0.01) {
+                        $differences['amount'] = [
+                            'current' => $currentAmount,
+                            'legacy' => $legacyAmount
+                        ];
+                        $needsUpdate = true;
+                    }
+
+                    // Comparar fechas
+                    $currentDateStart = $assignedPlan->date_start;
+                    $legacyDateStart = $this->parseDate($legacyPlan->fecha_ciclo_insertada);
+
+                    if ($currentDateStart != $legacyDateStart) {
+                        $differences['date_start'] = [
+                            'current' => $currentDateStart,
+                            'legacy' => $legacyDateStart
+                        ];
+                        $needsUpdate = true;
+                    }
+
+                    $currentDateEnd = $assignedPlan->date_end;
+                    $legacyDateEnd = $this->parseDate($legacyPlan->fecha_expiracion);
+
+                    if ($currentDateEnd != $legacyDateEnd) {
+                        $differences['date_end'] = [
+                            'current' => $currentDateEnd,
+                            'legacy' => $legacyDateEnd
+                        ];
+                        $needsUpdate = true;
+                    }
+
+                    // Si hay diferencias, actualizar el plan
+                    if ($needsUpdate) {
+                        $assignedPlan->update([
+                            'therapies_number' => $legacyTherapiesNumber,
+                            'total_sessions' => $legacyTotalSessions,
+                            'amount' => $legacyAmount,
+                            'date_start' => $legacyDateStart,
+                            'date_end' => $legacyDateEnd,
+                        ]);
+
+                        $assignedPlan->save();
+
+                        $results['updated_plans']++;
+                        $results['differences_found'][] = [
+                            'assigned_plan_id' => $assignedPlan->id,
+                            'patient_id' => $assignedPlan->patient_id,
+                            'patient_name' => $assignedPlan->patient->first_name . ' ' . $assignedPlan->patient->last_name ?? 'N/A',
+                            'plan_name' => $assignedPlan->plan_name,
+                            'differences' => $differences
+                        ];
+
+                        Log::info("Plan asignado actualizado", [
+                            'assigned_plan_id' => $assignedPlan->id,
+                            'patient_id' => $assignedPlan->patient_id,
+                            'differences' => $differences
+                        ]);
+                    }
+
+                } catch (\Exception $e) {
+                    $results['errors'][] = "Error procesando plan {$assignedPlan->id}: " . $e->getMessage();
+                    Log::error("Error actualizando plan asignado desde legacy", [
+                        'assigned_plan_id' => $assignedPlan->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json($results);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error en actualización de planes asignados desde legacy: ' . $e->getMessage(), [
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error durante la actualización: ' . $e->getMessage(),
+                'errors' => [$e->getMessage()]
+            ], 500);
+        }
+    }
+
     public function changeTypeOfPatient(Request $request)
     {
         $request->validate([
