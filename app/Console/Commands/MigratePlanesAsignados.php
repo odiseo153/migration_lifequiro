@@ -120,6 +120,39 @@ class MigratePlanesAsignados extends BaseCommand
 
                         }
 
+                        // VALIDACIÓN: Verificar que el consumido migrado sea exactamente igual al legacy
+                        $migrated_consumed = Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+
+                        if (abs($migrated_consumed - $p->consumido) > 0.01) { // Tolerancia de 1 centavo por redondeo
+                            $this->error("ERROR: Plan ID {$assignedPlan->id} - Consumido no coincide!");
+                            $this->error("  Legacy consumido: {$p->consumido}");
+                            $this->error("  Migrado consumido: {$migrated_consumed}");
+                            $this->error("  Diferencia: " . ($migrated_consumed - $p->consumido));
+
+                            // Eliminar vouchers creados para este plan
+                            Voucher::where('assigned_plan_id', $assignedPlan->id)->forceDelete();
+
+                            // Eliminar el plan asignado creado
+                            $assignedPlan->installments()->forceDelete();
+                            $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
+                            $assignedPlan->services()->forceDelete();
+                            $assignedPlan->ScheduledAppointments()->forceDelete();
+                            $assignedPlan->voucher()->each(function($voucher) {
+                                $voucher->plan_items()->detach();
+                                $voucher->patient_items()->detach();
+                            });
+                            $assignedPlan->voucher()->forceDelete();
+                            $assignedPlan->descuentAuthorizations()->forceDelete();
+                            $assignedPlan->planConsume()->forceDelete();
+                            $assignedPlan->transactions()->forceDelete();
+                            $assignedPlan->forceDelete();
+
+                            $this->error("Plan {$assignedPlan->id} eliminado debido a inconsistencia en consumido.");
+                            continue; // Saltar al siguiente plan
+                        }
+
+                        $this->info("✓ Plan ID {$assignedPlan->id} - Consumido verificado: {$migrated_consumed} = {$p->consumido}");
+
                         $priceAjuste = $total_consumed_items > 0 ? $p->consumido / $total_consumed_items : $item_price;
                         $priceTerapia = $priceAjuste;
 
@@ -180,6 +213,44 @@ class MigratePlanesAsignados extends BaseCommand
 
                 }
             });
+
+        // Validación final: Verificar todos los planes migrados
+        $this->info("Realizando validación final de consumidos...");
+
+        $total_plans = 0;
+        $valid_plans = 0;
+        $invalid_plans = 0;
+
+        AssignedPlan::chunk(100, function ($assignedPlans) use (&$total_plans, &$valid_plans, &$invalid_plans) {
+            foreach ($assignedPlans as $assignedPlan) {
+                $total_plans++;
+
+                // Buscar el plan legacy correspondiente
+                $legacyPlan = Ajuste::where('id', $assignedPlan->id)->first();
+
+                if ($legacyPlan) {
+                    $migrated_consumed = Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+
+                    if (abs($migrated_consumed - $legacyPlan->consumido) <= 0.01) {
+                        $valid_plans++;
+                    } else {
+                        $invalid_plans++;
+                        $this->warn("Plan {$assignedPlan->id}: Legacy={$legacyPlan->consumido}, Migrado={$migrated_consumed}");
+                    }
+                }
+            }
+        });
+
+        $this->info("=== RESUMEN DE VALIDACIÓN ===");
+        $this->info("Total planes verificados: {$total_plans}");
+        $this->info("Planes válidos: {$valid_plans}");
+        $this->info("Planes inválidos: {$invalid_plans}");
+
+        if ($invalid_plans > 0) {
+            $this->error("¡ATENCIÓN! {$invalid_plans} planes tienen inconsistencias en el consumido.");
+        } else {
+            $this->info("✓ Todos los planes tienen consumidos correctos.");
+        }
 
         $this->info("Migración de planes asignados completada.");
     }
