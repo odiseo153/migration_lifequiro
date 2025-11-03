@@ -96,38 +96,53 @@ class MigratePlanesAsignados extends BaseCommand
                             ]);
                         }
 
-                        // Calcular precio por ítem - CORREGIDO: usar valores del AssignedPlan
+                        // Calcular precio por ítem - IGUAL que en el sistema actual
                         $total_items = ($p->ajustes ?? 0) + ($p->terapias_fisicas ?? 0);
-                        $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
+                        $item_price = $total_items != 0 ? $p->costo / $total_items : 0;
 
-                        // Calcular cuántos vouchers necesitamos crear para que el consumo sea igual a $p->consumido
+                        // Calcular cuántos vouchers necesitamos crear
+                        // IMPORTANTE: consumido = count(vouchers) * item_price
                         $total_consumed_items = (int) $p->sesiones_utilizadas + (int) $p->terapias_utilizadas;
 
-                        // Crear vouchers - MEJORADO: Priorizar exactitud del consumido
-                        if ($p->consumido > 0 && $total_consumed_items > 0) {
-                            // Siempre usar el precio exacto basado en el consumido real
-                            $price_per_voucher = $p->consumido / $total_consumed_items;
-
+                        // Crear vouchers - CORREGIDO: Todos los vouchers deben tener el mismo precio (item_price)
+                        if ($total_consumed_items > 0) {
+                            // Crear un voucher por cada item consumido (sesión o terapia)
                             for ($i = 0; $i < $total_consumed_items; $i++) {
                                 Voucher::create([
                                     'assigned_plan_id' => $assignedPlan->id,
                                     'status' => 3,
                                     'quantity' => 1,
-                                    'price' => $price_per_voucher,
+                                    'price' => $item_price, // Todos los vouchers tienen el mismo precio
                                     'created_at' => $this->parseDateInt($p->fecha_cre),
                                 ]);
                             }
-
                         }
+                        // Si no hay items consumidos, no crear vouchers
 
                         // VALIDACIÓN: Verificar que el consumido migrado sea exactamente igual al legacy
-                        $migrated_consumed = Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+                        // Usar la misma fórmula que el sistema actual: count(vouchers) * item_price
+                        $voucher_count = Voucher::where('assigned_plan_id', $assignedPlan->id)->count();
+                        $migrated_consumed = round($voucher_count * $item_price, 2);
+                        $difference = $migrated_consumed - $p->consumido;
 
-                        if (abs($migrated_consumed - $p->consumido) > 0.01) { // Tolerancia de 1 centavo por redondeo
+                        if (abs($difference) > 0.01) { // Tolerancia de 1 centavo por redondeo
+                            $this->error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                             $this->error("ERROR: Plan ID {$assignedPlan->id} - Consumido no coincide!");
+                            $this->error("  Paciente ID: {$p->paciente_id}");
+                            $this->error("  Plan ID: {$p->plan_id}");
                             $this->error("  Legacy consumido: {$p->consumido}");
                             $this->error("  Migrado consumido: {$migrated_consumed}");
-                            $this->error("  Diferencia: " . ($migrated_consumed - $p->consumido));
+                            $this->error("  Diferencia: {$difference}");
+                            $this->error("  ");
+                            $this->error("  Cálculo:");
+                            $this->error("    Vouchers creados: {$voucher_count}");
+                            $this->error("    Precio por item: {$item_price}");
+                            $this->error("    Fórmula: {$voucher_count} * {$item_price} = {$migrated_consumed}");
+                            $this->error("  ");
+                            $this->error("  Items consumidos: {$total_consumed_items} (sesiones: {$p->sesiones_utilizadas}, terapias: {$p->terapias_utilizadas})");
+                            $this->error("  Total items plan: {$total_items} (sesiones: " . ($p->ajustes ?? 0) . ", terapias: " . ($p->terapias_fisicas ?? 0) . ")");
+                            $this->error("  Costo plan: {$p->costo}");
+                            $this->error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
                             // Eliminar vouchers creados para este plan
                             Voucher::where('assigned_plan_id', $assignedPlan->id)->forceDelete();
@@ -215,13 +230,16 @@ class MigratePlanesAsignados extends BaseCommand
             });
 
         // Validación final: Verificar todos los planes migrados
-        $this->info("Realizando validación final de consumidos...");
+        $this->info("\n" . str_repeat("=", 60));
+        $this->info("VALIDACIÓN FINAL DE CONSUMIDOS");
+        $this->info(str_repeat("=", 60));
 
         $total_plans = 0;
         $valid_plans = 0;
         $invalid_plans = 0;
+        $invalid_details = [];
 
-        AssignedPlan::chunk(100, function ($assignedPlans) use (&$total_plans, &$valid_plans, &$invalid_plans) {
+        AssignedPlan::chunk(100, function ($assignedPlans) use (&$total_plans, &$valid_plans, &$invalid_plans, &$invalid_details) {
             foreach ($assignedPlans as $assignedPlan) {
                 $total_plans++;
 
@@ -229,30 +247,54 @@ class MigratePlanesAsignados extends BaseCommand
                 $legacyPlan = Ajuste::where('id', $assignedPlan->id)->first();
 
                 if ($legacyPlan) {
-                    $migrated_consumed = Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+                    // Usar la misma fórmula: count(vouchers) * item_price
+                    $total_items = $assignedPlan->total_sessions + $assignedPlan->therapies_number;
+                    $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
+                    $voucher_count = Voucher::where('assigned_plan_id', $assignedPlan->id)->count();
+                    $migrated_consumed = round($voucher_count * $item_price, 2);
+                    $difference = $migrated_consumed - $legacyPlan->consumido;
 
-                    if (abs($migrated_consumed - $legacyPlan->consumido) <= 0.01) {
+                    if (abs($difference) <= 0.01) {
                         $valid_plans++;
                     } else {
                         $invalid_plans++;
-                        $this->warn("Plan {$assignedPlan->id}: Legacy={$legacyPlan->consumido}, Migrado={$migrated_consumed}");
+                        $invalid_details[] = [
+                            'id' => $assignedPlan->id,
+                            'legacy' => $legacyPlan->consumido,
+                            'migrated' => $migrated_consumed,
+                            'difference' => $difference
+                        ];
                     }
                 }
             }
         });
 
-        $this->info("=== RESUMEN DE VALIDACIÓN ===");
+        $this->info("\n" . str_repeat("=", 60));
+        $this->info("RESUMEN DE VALIDACIÓN");
+        $this->info(str_repeat("=", 60));
         $this->info("Total planes verificados: {$total_plans}");
-        $this->info("Planes válidos: {$valid_plans}");
-        $this->info("Planes inválidos: {$invalid_plans}");
+        $this->info("Planes válidos: {$valid_plans} (" . round(($valid_plans / max($total_plans, 1)) * 100, 2) . "%)");
+        $this->info("Planes inválidos: {$invalid_plans} (" . round(($invalid_plans / max($total_plans, 1)) * 100, 2) . "%)");
+        $this->info(str_repeat("=", 60));
 
         if ($invalid_plans > 0) {
-            $this->error("¡ATENCIÓN! {$invalid_plans} planes tienen inconsistencias en el consumido.");
+            $this->error("\n¡ATENCIÓN! {$invalid_plans} planes tienen inconsistencias en el consumido.");
+            $this->error("Los primeros 10 planes con errores:");
+
+            foreach (array_slice($invalid_details, 0, 10) as $detail) {
+                $this->error("  Plan {$detail['id']}: Legacy={$detail['legacy']}, Migrado={$detail['migrated']}, Diferencia={$detail['difference']}");
+            }
+
+            if ($invalid_plans > 10) {
+                $this->error("  ... y " . ($invalid_plans - 10) . " más.");
+            }
         } else {
-            $this->info("✓ Todos los planes tienen consumidos correctos.");
+            $this->info("\n✓ ¡ÉXITO! Todos los planes tienen consumidos correctos.");
         }
 
-        $this->info("Migración de planes asignados completada.");
+        $this->info("\n" . str_repeat("=", 60));
+        $this->info("MIGRACIÓN COMPLETADA");
+        $this->info(str_repeat("=", 60));
     }
 
 
