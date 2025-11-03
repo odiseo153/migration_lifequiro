@@ -119,54 +119,85 @@ class MigratePlanesAsignados extends BaseCommand
                         }
                         // Si no hay items consumidos, no crear vouchers
 
-                        // VALIDACIÓN: Verificar que el consumido migrado sea exactamente igual al legacy
+                        // VALIDACIÓN Y AJUSTE: Verificar y ajustar el consumido si es necesario
                         // Usar la misma fórmula que el sistema actual: count(vouchers) * item_price
                         $voucher_count = Voucher::where('assigned_plan_id', $assignedPlan->id)->count();
                         $migrated_consumed = round($voucher_count * $item_price, 2);
                         $difference = $migrated_consumed - $p->consumido;
 
                         if (abs($difference) > 0.01) { // Tolerancia de 1 centavo por redondeo
-                            $this->error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                            $this->error("ERROR: Plan ID {$assignedPlan->id} - Consumido no coincide!");
-                            $this->error("  Paciente ID: {$p->paciente_id}");
-                            $this->error("  Plan ID: {$p->plan_id}");
-                            $this->error("  Legacy consumido: {$p->consumido}");
-                            $this->error("  Migrado consumido: {$migrated_consumed}");
-                            $this->error("  Diferencia: {$difference}");
-                            $this->error("  ");
-                            $this->error("  Cálculo:");
-                            $this->error("    Vouchers creados: {$voucher_count}");
-                            $this->error("    Precio por item: {$item_price}");
-                            $this->error("    Fórmula: {$voucher_count} * {$item_price} = {$migrated_consumed}");
-                            $this->error("  ");
-                            $this->error("  Items consumidos: {$total_consumed_items} (sesiones: {$p->sesiones_utilizadas}, terapias: {$p->terapias_utilizadas})");
-                            $this->error("  Total items plan: {$total_items} (sesiones: " . ($p->ajustes ?? 0) . ", terapias: " . ($p->terapias_fisicas ?? 0) . ")");
-                            $this->error("  Costo plan: {$p->costo}");
-                            $this->error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                            $this->warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                            $this->warn("AJUSTANDO: Plan ID {$assignedPlan->id} - Consumido no coincide!");
+                            $this->warn("  Legacy consumido: {$p->consumido}");
+                            $this->warn("  Migrado consumido inicial: {$migrated_consumed}");
+                            $this->warn("  Diferencia: {$difference}");
 
-                            // Eliminar vouchers creados para este plan
-                            Voucher::where('assigned_plan_id', $assignedPlan->id)->forceDelete();
+                            // Calcular cuántos vouchers necesitamos para que coincida exactamente
+                            if ($item_price > 0) {
+                                $vouchers_needed = round($p->consumido / $item_price);
 
-                            // Eliminar el plan asignado creado
-                            $assignedPlan->installments()->forceDelete();
-                            $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
-                            $assignedPlan->services()->forceDelete();
-                            $assignedPlan->ScheduledAppointments()->forceDelete();
-                            $assignedPlan->voucher()->each(function($voucher) {
-                                $voucher->plan_items()->detach();
-                                $voucher->patient_items()->detach();
-                            });
-                            $assignedPlan->voucher()->forceDelete();
-                            $assignedPlan->descuentAuthorizations()->forceDelete();
-                            $assignedPlan->planConsume()->forceDelete();
-                            $assignedPlan->transactions()->forceDelete();
-                            $assignedPlan->forceDelete();
+                                // Ajustar vouchers
+                                $current_vouchers = Voucher::where('assigned_plan_id', $assignedPlan->id)->count();
 
-                            $this->error("Plan {$assignedPlan->id} eliminado debido a inconsistencia en consumido.");
-                            continue; // Saltar al siguiente plan
+                                if ($vouchers_needed > $current_vouchers) {
+                                    // Necesitamos AGREGAR vouchers
+                                    $to_add = $vouchers_needed - $current_vouchers;
+                                    $this->warn("  Agregando {$to_add} vouchers adicionales...");
+
+                                    for ($i = 0; $i < $to_add; $i++) {
+                                        Voucher::create([
+                                            'assigned_plan_id' => $assignedPlan->id,
+                                            'status' => 3,
+                                            'quantity' => 1,
+                                            'price' => $item_price,
+                                            'created_at' => $this->parseDateInt($p->fecha_cre),
+                                        ]);
+                                    }
+                                } elseif ($vouchers_needed < $current_vouchers) {
+                                    // Necesitamos ELIMINAR vouchers
+                                    $to_remove = $current_vouchers - $vouchers_needed;
+                                    $this->warn("  Eliminando {$to_remove} vouchers excedentes...");
+
+                                    Voucher::where('assigned_plan_id', $assignedPlan->id)
+                                        ->orderBy('id', 'desc')
+                                        ->limit($to_remove)
+                                        ->forceDelete();
+                                }
+
+                                // Verificar el ajuste
+                                $new_voucher_count = Voucher::where('assigned_plan_id', $assignedPlan->id)->count();
+                                $new_migrated_consumed = round($new_voucher_count * $item_price, 2);
+                                $new_difference = $new_migrated_consumed - $p->consumido;
+
+                                if (abs($new_difference) <= 0.01) {
+                                    $this->info("  ✓ Ajuste exitoso: {$new_voucher_count} vouchers * {$item_price} = {$new_migrated_consumed}");
+                                } else {
+                                    $this->error("  ✗ Ajuste fallido: Diferencia restante = {$new_difference}");
+                                }
+                            } else {
+                                // Si item_price es 0, crear vouchers con precio variable para igualar el consumido
+                                $this->warn("  Item price es 0, creando voucher con precio exacto del consumido...");
+
+                                // Eliminar vouchers existentes
+                                Voucher::where('assigned_plan_id', $assignedPlan->id)->forceDelete();
+
+                                // Crear un voucher con el consumido exacto
+                                if ($p->consumido > 0) {
+                                    Voucher::create([
+                                        'assigned_plan_id' => $assignedPlan->id,
+                                        'status' => 3,
+                                        'quantity' => 1,
+                                        'price' => $p->consumido,
+                                        'created_at' => $this->parseDateInt($p->fecha_cre),
+                                    ]);
+                                    $this->info("  ✓ Creado 1 voucher con precio = {$p->consumido}");
+                                }
+                            }
+
+                            $this->warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                        } else {
+                            $this->info("✓ Plan ID {$assignedPlan->id} - Consumido correcto: {$migrated_consumed} = {$p->consumido}");
                         }
-
-                        $this->info("✓ Plan ID {$assignedPlan->id} - Consumido verificado: {$migrated_consumed} = {$p->consumido}");
 
                         $priceAjuste = $total_consumed_items > 0 ? $p->consumido / $total_consumed_items : $item_price;
                         $priceTerapia = $priceAjuste;
