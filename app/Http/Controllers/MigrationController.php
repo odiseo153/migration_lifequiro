@@ -1409,11 +1409,6 @@ class MigrationController extends Controller
                             'differences' => $differences
                         ];
 
-                        Log::info("Plan asignado actualizado", [
-                            'assigned_plan_id' => $assignedPlan->id,
-                            'patient_id' => $assignedPlan->patient_id,
-                            'differences' => $differences
-                        ]);
                     }
 
                 } catch (\Exception $e) {
