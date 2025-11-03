@@ -34,6 +34,11 @@ class AssignedPlan extends BaseModel
         return $this->belongsTo(Plan::class);
     }
 
+    public function appointments()
+    {
+        return $this->hasMany(Appointment::class);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -62,6 +67,11 @@ class AssignedPlan extends BaseModel
     public function descuentAuthorizations()
     {
         return $this->hasMany(DescuentAuthorization::class);
+    }
+
+    public function planConsume()
+    {
+        return $this->hasMany(PlanConsume::class);
     }
 
     public function installments()

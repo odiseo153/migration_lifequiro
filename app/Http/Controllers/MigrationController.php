@@ -1476,6 +1476,62 @@ class MigrationController extends Controller
 
     }
 
+
+    public function deleteAssignedPlanForPatientBranch(Request $request)
+    {
+        ini_set('memory_limit', '2G');
+        ini_set('max_execution_time', 1000);
+
+        $request->validate([
+            'branch_id' => 'required|integer|exists:branches,id',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $assignedPlans = AssignedPlan::whereHas('patient', function($query) use ($request) {
+                $query->where('branch_id', $request->branch_id);
+            })->get();
+
+
+            foreach ($assignedPlans as $assignedPlan) {
+                $assignedPlan->installments()->forceDelete();
+                $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
+                $assignedPlan->services()->forceDelete();
+                $assignedPlan->ScheduledAppointments()->forceDelete();
+                $assignedPlan->voucher()->each(function($voucher) {
+                    $voucher->plan_items()->detach();
+                    $voucher->patient_items()->detach();
+                });
+                $assignedPlan->voucher()->forceDelete();
+                $assignedPlan->descuentAuthorizations()->forceDelete();
+                $assignedPlan->planConsume()->forceDelete();
+                $assignedPlan->transactions()->forceDelete();
+                $assignedPlan->forceDelete();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Planes asignados eliminados exitosamente'
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Error eliminando planes asignados: ' . $e->getMessage(), [
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error durante la eliminación: ' . $e->getMessage(),
+                'errors' => [$e->getMessage()]
+            ], 500);
+        }
+    }
+
     /**
      * Update vouchers for the assigned plan based on new consumed amount
      */

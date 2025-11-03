@@ -1678,6 +1678,8 @@ namespace App\Models {
      * @property int $id
      * @property-read mixed $name
      * @property-read \App\Models\Plan $plan
+     * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Appointment> $appointments
+     * @property-read int|null $appointments_count
      * @property-read \App\Models\User $user
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\AcquiredService> $services
      * @property-read int|null $services_count
@@ -1687,6 +1689,8 @@ namespace App\Models {
      * @property-read \App\Models\Patient $patient
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DescuentAuthorization> $descuentAuthorizations
      * @property-read int|null $descuentAuthorizations_count
+     * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PlanConsume> $planConsume
+     * @property-read int|null $planConsume_count
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Installment> $installments
      * @property-read int|null $installments_count
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Session> $sessions

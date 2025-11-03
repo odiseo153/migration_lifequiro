@@ -16,6 +16,7 @@ Route::put('/change-type-of-patient', [App\Http\Controllers\MigrationController:
 
 // Update assigned plans from legacy database
 Route::post('/update-assigned-plans-from-legacy', [App\Http\Controllers\MigrationController::class, 'updateAssignedPlansFromLegacy']);
+Route::post('/delete-assigned-plans-for-patient-branch', [App\Http\Controllers\MigrationController::class, 'deleteAssignedPlanForPatientBranch']);
 
 // Test endpoint to check assigned plan data
 Route::post('/test-assigned-plan-data', [App\Http\Controllers\MigrationController::class, 'testAssignedPlanData']);
