@@ -1364,6 +1364,7 @@ class MigrationController extends Controller
                     }
 
                     // Comparar fechas
+                    /*
                     $currentDateStart = $assignedPlan->date_start;
                     $legacyDateStart = $this->parseDate($legacyPlan->fecha_ciclo_insertada);
 
@@ -1385,6 +1386,7 @@ class MigrationController extends Controller
                         ];
                         $needsUpdate = true;
                     }
+                    */
 
                     // Si hay diferencias, actualizar el plan
                     if ($needsUpdate) {
@@ -1392,8 +1394,8 @@ class MigrationController extends Controller
                             'therapies_number' => $legacyTherapiesNumber,
                             'total_sessions' => $legacyTotalSessions,
                             'amount' => $legacyAmount,
-                            'date_start' => $legacyDateStart,
-                            'date_end' => $legacyDateEnd,
+                    //        'date_start' => $legacyDateStart,
+                      //      'date_end' => $legacyDateEnd,
                         ]);
 
                         $assignedPlan->save();
