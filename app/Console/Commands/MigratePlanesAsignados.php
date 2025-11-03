@@ -107,37 +107,38 @@ class MigratePlanesAsignados extends BaseCommand
                             ]);
                         }
 
-                        // VALIDACIÓN: Verificar que el consumido sea exactamente igual al legacy
-                        $migrated_consumed = Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
-                        $difference = $migrated_consumed - $p->consumido;
+                        // VALIDACIÓN: Verificar que el consumido sea exactamente igual al legacy (números enteros)
+                        $migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+                        $legacy_consumed = (int) $p->consumido;
+                        $difference = $migrated_consumed - $legacy_consumed;
 
-                        if (abs($difference) > 0.01) { // Tolerancia de 1 centavo por redondeo
+                        if ($difference != 0) {
                             $this->warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                             $this->warn("AJUSTANDO: Plan ID {$assignedPlan->id} - Consumido no coincide!");
-                            $this->warn("  Legacy consumido: {$p->consumido}");
+                            $this->warn("  Legacy consumido: {$legacy_consumed}");
                             $this->warn("  Migrado consumido: {$migrated_consumed}");
                             $this->warn("  Diferencia: {$difference}");
 
                             // Eliminar el voucher existente y crear uno con el precio correcto
                             Voucher::where('assigned_plan_id', $assignedPlan->id)->forceDelete();
 
-                            if ($p->consumido > 0) {
+                            if ($legacy_consumed > 0) {
                                 Voucher::create([
                                     'assigned_plan_id' => $assignedPlan->id,
                                     'status' => 3,
                                     'quantity' => 1,
-                                    'price' => $p->consumido,
+                                    'price' => $legacy_consumed,
                                     'created_at' => $this->parseDateInt($p->fecha_cre),
                                 ]);
                             }
 
                             // Verificar el ajuste
-                            $new_migrated_consumed = Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+                            $new_migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
 
-                            if (abs($new_migrated_consumed - $p->consumido) <= 0.01) {
+                            if ($new_migrated_consumed == $legacy_consumed) {
                                 $this->info("  ✓ Ajuste exitoso: Voucher con precio = {$new_migrated_consumed}");
                             } else {
-                                $this->error("  ✗ Ajuste fallido: Diferencia restante = " . ($new_migrated_consumed - $p->consumido));
+                                $this->error("  ✗ Ajuste fallido: Diferencia restante = " . ($new_migrated_consumed - $legacy_consumed));
                             }
 
                             $this->warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -228,20 +229,18 @@ class MigratePlanesAsignados extends BaseCommand
                 $legacyPlan = Ajuste::where('id', $assignedPlan->id)->first();
 
                 if ($legacyPlan) {
-                    // Usar la misma fórmula: count(vouchers) * item_price
-                    $total_items = $assignedPlan->total_sessions + $assignedPlan->therapies_number;
-                    $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
-                    $voucher_count = Voucher::where('assigned_plan_id', $assignedPlan->id)->count();
-                    $migrated_consumed = round($voucher_count * $item_price, 2);
-                    $difference = $migrated_consumed - $legacyPlan->consumido;
+                    // Validar consumido (números enteros)
+                    $migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+                    $legacy_consumed = (int) $legacyPlan->consumido;
+                    $difference = $migrated_consumed - $legacy_consumed;
 
-                    if (abs($difference) <= 0.01) {
+                    if ($difference == 0) {
                         $valid_plans++;
                     } else {
                         $invalid_plans++;
                         $invalid_details[] = [
                             'id' => $assignedPlan->id,
-                            'legacy' => $legacyPlan->consumido,
+                            'legacy' => $legacy_consumed,
                             'migrated' => $migrated_consumed,
                             'difference' => $difference
                         ];
