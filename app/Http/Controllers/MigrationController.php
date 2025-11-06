@@ -93,6 +93,7 @@ class MigrationController extends Controller
             }
             if (!empty($migratedPatients)) {
                 // 2. Migrar planes asignados
+
                 $this->migratePlanes($patientIds, $results, $idMapping);
 
                 // 3. Migrar balance
@@ -347,8 +348,20 @@ class MigrationController extends Controller
                     continue;
                 }
 
-                // Usar el ID mapeado si existe, sino usar el original
-                $finalPatientId = $idMapping[$p->paciente_id] ?? $p->paciente_id;
+                // Verificar que el paciente esté en el mapeo
+                if (!isset($idMapping[$p->paciente_id])) {
+                    $results['errors'][] = "Paciente {$p->paciente_id} no fue migrado, saltando plan {$p->id}";
+                    continue;
+                }
+
+                // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
+                $finalPatientId = $idMapping[$p->paciente_id];
+
+                // Verificar que el paciente exista en la nueva base de datos
+                if (!Patient::find($finalPatientId)) {
+                    $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$p->paciente_id}) no existe en la BD, saltando plan {$p->id}";
+                    continue;
+                }
 
                 $assignedPlan = AssignedPlan::create([
                     'id' => $p->id,
@@ -487,11 +500,18 @@ class MigrationController extends Controller
 
         foreach ($balances as $balance) {
             try {
-                // Usar el ID mapeado si existe, sino usar el original
-                $finalPatientId = $idMapping[$balance->paciente_id] ?? $balance->paciente_id;
+                // Verificar que el paciente esté en el mapeo
+                if (!isset($idMapping[$balance->paciente_id])) {
+                    $results['errors'][] = "Paciente {$balance->paciente_id} no fue migrado, saltando balance {$balance->id}";
+                    continue;
+                }
 
+                // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
+                $finalPatientId = $idMapping[$balance->paciente_id];
+
+                // Verificar que el paciente exista en la nueva base de datos
                 if (!Patient::find($finalPatientId)) {
-                    $results['errors'][] = "Paciente no encontrado para balance - ID: {$balance->paciente_id} (mapeado: {$finalPatientId})";
+                    $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$balance->paciente_id}) no existe en la BD, saltando balance {$balance->id}";
                     continue;
                 }
 
@@ -532,11 +552,18 @@ class MigrationController extends Controller
 
         foreach ($compras as $compra) {
             try {
-                // Usar el ID mapeado si existe, sino usar el original
-                $finalPatientId = $idMapping[$compra->paciente_id] ?? $compra->paciente_id;
+                // Verificar que el paciente esté en el mapeo
+                if (!isset($idMapping[$compra->paciente_id])) {
+                    $results['errors'][] = "Paciente {$compra->paciente_id} no fue migrado, saltando compra {$compra->id}";
+                    continue;
+                }
 
+                // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
+                $finalPatientId = $idMapping[$compra->paciente_id];
+
+                // Verificar que el paciente exista en la nueva base de datos
                 if (!Patient::find($finalPatientId)) {
-                    $results['errors'][] = "Paciente no encontrado para compra - ID: {$compra->paciente_id} (mapeado: {$finalPatientId})";
+                    $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$compra->paciente_id}) no existe en la BD, saltando compra {$compra->id}";
                     continue;
                 }
 
@@ -576,12 +603,19 @@ class MigrationController extends Controller
 
         foreach ($antecedentes as $antecedente) {
             try {
-                // Usar el ID mapeado si existe, sino usar el original
-                $finalPatientId = $idMapping[$antecedente->paciente_id] ?? $antecedente->paciente_id;
+                // Verificar que el paciente esté en el mapeo
+                if (!isset($idMapping[$antecedente->paciente_id])) {
+                    $results['errors'][] = "Paciente {$antecedente->paciente_id} no fue migrado, saltando antecedente {$antecedente->id}";
+                    continue;
+                }
 
+                // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
+                $finalPatientId = $idMapping[$antecedente->paciente_id];
+
+                // Verificar que el paciente exista en la nueva base de datos
                 $patient = Patient::find($finalPatientId);
                 if (!$patient) {
-                    $results['errors'][] = "Paciente no encontrado para antecedente - ID: {$antecedente->paciente_id} (mapeado: {$finalPatientId})";
+                    $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$antecedente->paciente_id}) no existe en la BD, saltando antecedente {$antecedente->id}";
                     continue;
                 }
 
@@ -608,11 +642,18 @@ class MigrationController extends Controller
 
         foreach ($historiales as $historial) {
             try {
-                // Usar el ID mapeado si existe, sino usar el original
-                $finalPatientId = $idMapping[$historial->paciente_id] ?? $historial->paciente_id;
+                // Verificar que el paciente esté en el mapeo
+                if (!isset($idMapping[$historial->paciente_id])) {
+                    $results['errors'][] = "Paciente {$historial->paciente_id} no fue migrado, saltando historial ajuste {$historial->id}";
+                    continue;
+                }
 
+                // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
+                $finalPatientId = $idMapping[$historial->paciente_id];
+
+                // Verificar que el paciente exista en la nueva base de datos
                 if (!Patient::find($finalPatientId)) {
-                    $results['errors'][] = "Paciente no encontrado para historial ajuste - ID: {$historial->paciente_id} (mapeado: {$finalPatientId})";
+                    $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$historial->paciente_id}) no existe en la BD, saltando historial ajuste {$historial->id}";
                     continue;
                 }
 
@@ -750,11 +791,18 @@ class MigrationController extends Controller
 
         foreach ($historiales as $historial) {
             try {
-                // Usar el ID mapeado si existe, sino usar el original
-                $finalPatientId = $idMapping[$historial->paciente_id] ?? $historial->paciente_id;
+                // Verificar que el paciente esté en el mapeo
+                if (!isset($idMapping[$historial->paciente_id])) {
+                    $results['errors'][] = "Paciente {$historial->paciente_id} no fue migrado, saltando historial terapia {$historial->id}";
+                    continue;
+                }
 
+                // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
+                $finalPatientId = $idMapping[$historial->paciente_id];
+
+                // Verificar que el paciente exista en la nueva base de datos
                 if (!Patient::find($finalPatientId)) {
-                    $results['errors'][] = "Paciente no encontrado para historial terapia - ID: {$historial->paciente_id} (mapeado: {$finalPatientId})";
+                    $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$historial->paciente_id}) no existe en la BD, saltando historial terapia {$historial->id}";
                     continue;
                 }
 
@@ -1343,6 +1391,7 @@ class MigrationController extends Controller
                         $needsUpdate = true;
                     }
 
+dd($currentTotalSessions,$legacyTotalSessions);
                     if ($currentTotalSessions != $legacyTotalSessions) {
                         $differences['total_sessions'] = [
                             'current' => $currentTotalSessions,
@@ -1398,7 +1447,6 @@ class MigrationController extends Controller
                       //      'date_end' => $legacyDateEnd,
                         ]);
 
-                        $assignedPlan->save();
 
                         $results['updated_plans']++;
                         $results['differences_found'][] = [
