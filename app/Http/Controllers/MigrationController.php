@@ -373,6 +373,7 @@ class MigrationController extends Controller
                     'paid_type' => 1,
                     'amount' => $p->costo,
                     'therapies_number' => $p->terapias_fisicas,
+                    'total_sessions' => $p->ajustes,
                     'number_installments' => Plan::find($p->plan_id)->number_installments ?? 0,
                     'status' => $planStatusMatch[$p->estado],
                     'branch_id' => $p->centro_id,
