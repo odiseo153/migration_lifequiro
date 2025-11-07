@@ -1492,35 +1492,48 @@ class MigrationController extends Controller
             'branch_id' => 'required|integer|exists:branches,id',
         ]);
 
+        $batchSize = 100; // Ajusta el tamaño del lote según recursos disponibles
+
         try {
             DB::beginTransaction();
 
-            $assignedPlans = AssignedPlan::whereHas('patient', function ($query) use ($request) {
+            $totalDeleted = 0;
+
+            AssignedPlan::whereHas('patient', function ($query) use ($request) {
                 $query->where('branch_id', $request->branch_id);
-            })->get();
+            })
+            ->chunkById($batchSize, function ($assignedPlans) use (&$totalDeleted) {
+                foreach ($assignedPlans as $assignedPlan) {
+                    // Eliminar las relaciones y datos dependientes de manera adecuada
+                    $assignedPlan->installments()->forceDelete();
+                    $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
+                    $assignedPlan->services()->forceDelete();
+                    $assignedPlan->ScheduledAppointments()->forceDelete();
+                    $assignedPlan->voucher()->each(function ($voucher) {
+                        $voucher->plan_items()->detach();
+                        $voucher->patient_items()->detach();
+                    });
+                    $assignedPlan->voucher()->forceDelete();
+                    $assignedPlan->descuentAuthorizations()->forceDelete();
+                    $assignedPlan->planConsume()->forceDelete();
+                    $assignedPlan->transactions()->forceDelete();
+                    $assignedPlan->forceDelete();
 
+                    $totalDeleted++;
+                }
 
-            foreach ($assignedPlans as $assignedPlan) {
-                $assignedPlan->installments()->forceDelete();
-                $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
-                $assignedPlan->services()->forceDelete();
-                $assignedPlan->ScheduledAppointments()->forceDelete();
-                $assignedPlan->voucher()->each(function ($voucher) {
-                    $voucher->plan_items()->detach();
-                    $voucher->patient_items()->detach();
-                });
-                $assignedPlan->voucher()->forceDelete();
-                $assignedPlan->descuentAuthorizations()->forceDelete();
-                $assignedPlan->planConsume()->forceDelete();
-                $assignedPlan->transactions()->forceDelete();
-                $assignedPlan->forceDelete();
-            }
+                // Liberar memoria en cada lote
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
+            });
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Planes asignados eliminados exitosamente'
+                'message' => 'Planes asignados eliminados exitosamente',
+                'deleted_count' => $totalDeleted
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
