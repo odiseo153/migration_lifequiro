@@ -1373,7 +1373,6 @@ class MigrationController extends Controller
                         $needsUpdate = true;
                     }
 
-                    dd($currentTotalSessions, $legacyTotalSessions);
                     if ($currentTotalSessions != $legacyTotalSessions) {
                         $differences['total_sessions'] = [
                             'current' => $currentTotalSessions,
