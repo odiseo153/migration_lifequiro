@@ -1309,7 +1309,6 @@ class MigrationController extends Controller
             'check_all' => 'boolean'
         ]);
 
-        try {
             DB::beginTransaction();
 
             $results = [
@@ -1343,7 +1342,6 @@ class MigrationController extends Controller
             }
 
             foreach ($assignedPlans as $assignedPlan) {
-                try {
                     $results['checked_plans']++;
 
                     // Buscar el plan en la base de datos legacy
@@ -1440,33 +1438,12 @@ class MigrationController extends Controller
 
                     }
 
-                } catch (\Exception $e) {
-                    $results['errors'][] = "Error procesando plan {$assignedPlan->id}: " . $e->getMessage();
-                    Log::error("Error actualizando plan asignado desde legacy", [
-                        'assigned_plan_id' => $assignedPlan->id,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-                }
             }
 
             DB::commit();
 
             return response()->json($results);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error en actualización de planes asignados desde legacy: ' . $e->getMessage(), [
-                'request' => $request->all(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error durante la actualización: ' . $e->getMessage(),
-                'errors' => [$e->getMessage()]
-            ], 500);
-        }
     }
 
     public function changeTypeOfPatient(Request $request)
