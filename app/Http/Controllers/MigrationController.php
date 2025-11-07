@@ -1486,40 +1486,55 @@ class MigrationController extends Controller
     public function deleteAssignedPlanForPatientBranch(Request $request)
     {
         ini_set('memory_limit', '2G');
-        ini_set('max_execution_time', 1000);
+        ini_set('max_execution_time', 600); // Aumenta a 10 minutos (ajusta si es necesario)
 
         $request->validate([
             'branch_id' => 'required|integer|exists:branches,id',
         ]);
 
-        $batchSize = 100; // Ajusta el tamaño del lote según recursos disponibles
+        $batchSize = 20; // Reduce el tamaño del lote para evitar sobrecargar la ejecución
+
+        $totalDeleted = 0;
 
         try {
-            DB::beginTransaction();
+            // NO uses transacciones grandes con operaciones de mucha duración y borrados en lote de datos masivos
 
-            $totalDeleted = 0;
-
+            // Recorre lote a lote fuera de una transacción global (más seguro para grandes cantidades)
             AssignedPlan::whereHas('patient', function ($query) use ($request) {
                 $query->where('branch_id', $request->branch_id);
             })
             ->chunkById($batchSize, function ($assignedPlans) use (&$totalDeleted) {
                 foreach ($assignedPlans as $assignedPlan) {
-                    // Eliminar las relaciones y datos dependientes de manera adecuada
-                    $assignedPlan->installments()->forceDelete();
-                    $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
-                    $assignedPlan->services()->forceDelete();
-                    $assignedPlan->ScheduledAppointments()->forceDelete();
-                    $assignedPlan->voucher()->each(function ($voucher) {
-                        $voucher->plan_items()->detach();
-                        $voucher->patient_items()->detach();
-                    });
-                    $assignedPlan->voucher()->forceDelete();
-                    $assignedPlan->descuentAuthorizations()->forceDelete();
-                    $assignedPlan->planConsume()->forceDelete();
-                    $assignedPlan->transactions()->forceDelete();
-                    $assignedPlan->forceDelete();
+                    try {
+                        DB::beginTransaction();
 
-                    $totalDeleted++;
+                        // Eliminar las relaciones y datos dependientes de manera adecuada
+                        $assignedPlan->installments()->forceDelete();
+                        $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
+                        $assignedPlan->services()->forceDelete();
+                        $assignedPlan->ScheduledAppointments()->forceDelete();
+                        $assignedPlan->voucher()->each(function ($voucher) {
+                            $voucher->plan_items()->detach();
+                            $voucher->patient_items()->detach();
+                        });
+                        $assignedPlan->voucher()->forceDelete();
+                        $assignedPlan->descuentAuthorizations()->forceDelete();
+                        $assignedPlan->planConsume()->forceDelete();
+                        $assignedPlan->transactions()->forceDelete();
+                        $assignedPlan->forceDelete();
+
+                        $totalDeleted++;
+
+                        DB::commit();
+                    } catch (\Throwable $inner) {
+                        DB::rollBack();
+                        Log::error('Error eliminando plan asignado (por lote): ' . $inner->getMessage(), [
+                            'assigned_plan_id' => $assignedPlan->id,
+                            'trace' => $inner->getTraceAsString()
+                        ]);
+                        // Continúa con el siguiente
+                        continue;
+                    }
                 }
 
                 // Liberar memoria en cada lote
@@ -1528,16 +1543,12 @@ class MigrationController extends Controller
                 }
             });
 
-            DB::commit();
-
             return response()->json([
                 'success' => true,
                 'message' => 'Planes asignados eliminados exitosamente',
                 'deleted_count' => $totalDeleted
             ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
+        } catch (\Throwable $e) {
             Log::error('Error eliminando planes asignados: ' . $e->getMessage(), [
                 'request' => $request->all(),
                 'trace' => $e->getTraceAsString()
