@@ -1490,6 +1490,7 @@ class MigrationController extends Controller
 
         $request->validate([
             'branch_id' => 'required|integer|exists:branches,id',
+            'count' => 'required|integer',
         ]);
 
         $batchSize = 20; // Reduce el tamaño del lote para evitar sobrecargar la ejecución
@@ -1503,6 +1504,7 @@ class MigrationController extends Controller
             AssignedPlan::whereHas('patient', function ($query) use ($request) {
                 $query->where('branch_id', $request->branch_id);
             })
+            ->limit($request->count)
             ->chunkById($batchSize, function ($assignedPlans) use (&$totalDeleted) {
                 foreach ($assignedPlans as $assignedPlan) {
                     try {
