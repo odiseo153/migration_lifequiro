@@ -41,6 +41,11 @@ class MigrateAntecedentes extends BaseCommand
                     continue;
                 }
 
+                if (MedicalRecord::find($antecedente->id)) {
+                    $this->warn("Antecedente ya migrado - ID: {$antecedente->id}. Omitiendo registro.");
+                    continue;
+                }
+
                 MedicalRecord::create([
                     'patient_id' => $patient->id,
                     'id' => $antecedente->id,
