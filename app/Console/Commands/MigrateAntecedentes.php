@@ -35,7 +35,7 @@ class MigrateAntecedentes extends BaseCommand
         whereNotIn('paciente_id', MedicalRecord::pluck('patient_id')->toArray())
         ->chunk(100, function ($antecedentes) {
             foreach ($antecedentes as $antecedente) {
-                $patient = Patient::find($antecedente->paciente_id);
+                $patient = Patient::whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)->find($antecedente->paciente_id);
                 if (!$patient) {
                     $this->warn("Paciente no encontrado - ID: {$antecedente->paciente_id}. Omitiendo registro.");
                     continue;

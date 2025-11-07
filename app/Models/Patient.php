@@ -36,6 +36,7 @@ class Patient extends AuthenticablePatient
 
     protected $appends = ['is_birthday','age','patient_code','type_patient','where_he_met_us_name','last_appointment'];
    // protected $with = ['assigned_plan'];
+   const BRANCHS_TO_MIGRATE=[3];
 
     public function waiting_rooms()
     {

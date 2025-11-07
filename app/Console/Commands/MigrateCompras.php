@@ -42,7 +42,7 @@ class MigrateCompras extends BaseCommand
             9 => ItemType::TERAPIA_FISICA->value,
         ];
         $patientIds = Patient::
-        where('branch_id',6)
+        whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)
        ->pluck('id')->toArray();
 
         \DB::transaction(function() use ($comprasTipo, $patientIds) {

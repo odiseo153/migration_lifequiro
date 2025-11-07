@@ -40,7 +40,7 @@ class MigrateHistorialAjuste extends BaseCommand
         $this->info("Iniciando migración de historial ajuste...");
 
         $patientIds = Patient::
-        where('branch_id',5)
+        whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)
        ->pluck('id')->toArray();
 
         HistorialAjuste::

@@ -34,68 +34,72 @@ class MigrateCitasProgramadas extends BaseCommand
         //por cada dia hay una hora, quiero que crees una entidad por cada dia y le pongas su hora por ejemplo los dias vienen asi :"l,i"
 
         CitasProgramadas::
-        whereNotIn('id', ProgrammingHistory::pluck('id')->toArray())
-        ->whereIn('ajuste_plan_id', AssignedPlan::whereIn('status', [PlanStatus::Activo->value])->pluck('id')->toArray())
-        ->chunk(500, function ($pacientes) {
-            foreach ($pacientes as $p) {
-                $assignedPlan = AssignedPlan::whereIn('status', [PlanStatus::Activo->value])->find($p->ajuste_plan_id);
-                $patient = Patient::find($p->paciente_id);
+            whereNotIn('id', ProgrammingHistory::pluck('id')->toArray())
+            ->whereIn('ajuste_plan_id', AssignedPlan::whereIn('status', [PlanStatus::Activo->value])->
+                whereHas('patient', function ($query) {
+                    $query->whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE);
+                })
+                ->pluck('id')->toArray())
+            ->chunk(500, function ($pacientes) {
+                foreach ($pacientes as $p) {
+                    $assignedPlan = AssignedPlan::whereIn('status', [PlanStatus::Activo->value])->find($p->ajuste_plan_id);
+                    $patient = Patient::find($p->paciente_id);
 
-                if (
-                    $patient == null
-                ) {
-                    $this->warn("paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
-                    continue;
-                }
+                    if (
+                        $patient == null
+                    ) {
+                        $this->warn("paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
+                        continue;
+                    }
 
 
-                if (
-                    $p->dias == '' && $p->horas == ''
-                ) {
-                    $this->warn("dias y horas no encontrados - ID: {$p->id}. Omitiendo registro.");
-                    continue;
-                }
+                    if (
+                        $p->dias == '' && $p->horas == ''
+                    ) {
+                        $this->warn("dias y horas no encontrados - ID: {$p->id}. Omitiendo registro.");
+                        continue;
+                    }
 
-                // Separar días y horas por comas
-                $days = explode(',', trim($p->dias, ','));
-                $hours = explode(',', trim($p->horas, ','));
+                    // Separar días y horas por comas
+                    $days = explode(',', trim($p->dias, ','));
+                    $hours = explode(',', trim($p->horas, ','));
 
-                $dayMapping = [
-                    'l' => 'Monday',
-                    'm' => 'Tuesday',
-                    'i' => 'Wednesday',
-                    'j' => 'Thursday',
-                    'v' => 'Friday',
-                    's' => 'Saturday',
-                    'd' => 'Sunday',
-                ];
+                    $dayMapping = [
+                        'l' => 'Monday',
+                        'm' => 'Tuesday',
+                        'i' => 'Wednesday',
+                        'j' => 'Thursday',
+                        'v' => 'Friday',
+                        's' => 'Saturday',
+                        'd' => 'Sunday',
+                    ];
 
-                // Crear un ProgrammingHistory por cada día
-                foreach ($days as $index => $day) {
-                    if (empty(trim($day)))
-                        continue; // Saltar días vacíos
+                    // Crear un ProgrammingHistory por cada día
+                    foreach ($days as $index => $day) {
+                        if (empty(trim($day)))
+                            continue; // Saltar días vacíos
+    
+                        $dayName = $dayMapping[trim($day)] ?? null;
+                        $hour = isset($hours[$index]) ? trim($hours[$index]) : null;
 
-                    $dayName = $dayMapping[trim($day)] ?? null;
-                    $hour = isset($hours[$index]) ? trim($hours[$index]) : null;
+                        if ($dayName && $hour && $assignedPlan) {
+                            // Convertir hora de formato AM/PM a 24 horas
+                            $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $hour)->format('H:i:s');
 
-                    if ($dayName && $hour && $assignedPlan) {
-                        // Convertir hora de formato AM/PM a 24 horas
-                        $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $hour)->format('H:i:s');
-
-                        ProgrammingHistory::create([
-                            'branch_id' => $assignedPlan->branch_id,
-                            'patient_id' => $p->paciente_id,
-                            'assigned_plan_id' => $p->ajuste_plan_id,
-                            'day' => $dayName,
-                            'hour' => $hourFormatted,
-                            'activation_date' => $this->parseDate($p->fecha_activacion),
-                            'is_active' => $p->estado == 1 ? true : false,
-                            'created_at' => $this->parseDate($p->fecha),
-                        ]);
+                            ProgrammingHistory::create([
+                                'branch_id' => $assignedPlan->branch_id,
+                                'patient_id' => $p->paciente_id,
+                                'assigned_plan_id' => $p->ajuste_plan_id,
+                                'day' => $dayName,
+                                'hour' => $hourFormatted,
+                                'activation_date' => $this->parseDate($p->fecha_activacion),
+                                'is_active' => $p->estado == 1 ? true : false,
+                                'created_at' => $this->parseDate($p->fecha),
+                            ]);
+                        }
                     }
                 }
-            }
-        });
+            });
 
         /*
         Estado

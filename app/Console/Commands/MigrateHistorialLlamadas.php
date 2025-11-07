@@ -40,7 +40,9 @@ class MigrateHistorialLlamadas extends BaseCommand
         // Obtener IDs de pacientes cuyas citas no tienen CallHistory
         $patientIdsWithoutCallHistory = Patient::whereHas('appointments', function ($query) use ($appointmentIdsWithCallHistory) {
             $query->whereNotIn('id', $appointmentIdsWithCallHistory);
-        })->pluck('id')->toArray();
+        })
+        ->whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)
+        ->pluck('id')->toArray();
 
         Cita::
         where('nota_cita', '!=', '')

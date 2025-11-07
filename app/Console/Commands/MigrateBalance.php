@@ -36,7 +36,7 @@ class MigrateBalance extends BaseCommand
         ->whereNotIn('id', CreditNote::pluck('id')->toArray())
         ->chunk(500, function ($pacientes) {
             foreach ($pacientes as $p) {
-                if (!Patient::find($p->paciente_id)) {
+                if (!Patient::whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)->find($p->paciente_id)) {
                     $this->warn("Paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
                     continue;
                 }

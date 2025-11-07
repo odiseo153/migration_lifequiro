@@ -103,7 +103,7 @@ class MigrateHistorialTerapiaFisicas extends BaseCommand
             DB::transaction(function () use ($historiales,$itemsMatchTerapiaFisica) {
                 foreach ($historiales as $historial) {
 
-                    if (!Patient::find($historial->paciente_id)) {
+                    if (!Patient::whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)->find($historial->paciente_id)) {
                         $this->warn("Paciente no encontrado - ID: {$historial->paciente_id}. Omitiendo registro.");
                         continue;
                     }

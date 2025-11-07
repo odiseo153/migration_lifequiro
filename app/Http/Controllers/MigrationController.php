@@ -428,34 +428,15 @@ class MigrationController extends Controller
         $total_items = $assignedPlan->plan->total_sessions + $assignedPlan->therapies_number;
         $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
 
-        $total_consumed_items = (int) $p->sesiones_utilizadas + (int) $p->terapias_utilizadas;
-
         // Crear vouchers
-        if ($p->consumido > 0 && $item_price > 0) {
-            $vouchers_needed = round($p->consumido / $item_price);
-            $vouchers_needed = min($vouchers_needed, $total_consumed_items);
-
-            for ($i = 0; $i < $vouchers_needed; $i++) {
-                Voucher::create([
-                    'assigned_plan_id' => $assignedPlan->id,
-                    'status' => 3,
-                    'quantity' => 1,
-                    'price' => $item_price,
-                    'created_at' => $this->parseDateInt($p->fecha_cre),
-                ]);
-            }
-        } elseif ($p->consumido > 0 && $total_consumed_items > 0) {
-            $price_per_voucher = $p->consumido / $total_consumed_items;
-
-            for ($i = 0; $i < $total_consumed_items; $i++) {
-                Voucher::create([
-                    'assigned_plan_id' => $assignedPlan->id,
-                    'status' => 3,
-                    'quantity' => 1,
-                    'price' => $price_per_voucher,
-                    'created_at' => $this->parseDateInt($p->fecha_cre),
-                ]);
-            }
+        if ($p->consumido > 0) {
+            Voucher::create([
+                'assigned_plan_id' => $assignedPlan->id,
+                'status' => 3,
+                'quantity' => 1,
+                'price' => $p->consumido,
+                'created_at' => $this->parseDateInt($p->fecha_cre),
+            ]);
         }
 
         // Crear servicios adquiridos para ajustes
@@ -1132,7 +1113,7 @@ class MigrationController extends Controller
             }
 
             if ($request->has('descuent')) {
-              //  $descuents = $assignedPlan->descuentAuthorizations()->whereIn('status', [AuthorizationStatus::AUTORIZADO->value, AuthorizationStatus::APROBADO->value])->get();
+                //  $descuents = $assignedPlan->descuentAuthorizations()->whereIn('status', [AuthorizationStatus::AUTORIZADO->value, AuthorizationStatus::APROBADO->value])->get();
 
                 $user = Role::find(1)->users()->first();
 
@@ -1348,7 +1329,7 @@ class MigrationController extends Controller
                 $assignedPlans = AssignedPlan::whereIn('patient_id', $request->patient_ids)->get();
             } elseif ($request->has('branch_ids') && !empty($request->branch_ids)) {
                 // Revisar planes de pacientes por branch_id
-                $assignedPlans = AssignedPlan::whereHas('patient', function($query) use ($request) {
+                $assignedPlans = AssignedPlan::whereHas('patient', function ($query) use ($request) {
                     $query->whereIn('branch_id', $request->branch_ids);
                 })->get();
             } elseif ($request->check_all) {
@@ -1392,7 +1373,7 @@ class MigrationController extends Controller
                         $needsUpdate = true;
                     }
 
-dd($currentTotalSessions,$legacyTotalSessions);
+                    dd($currentTotalSessions, $legacyTotalSessions);
                     if ($currentTotalSessions != $legacyTotalSessions) {
                         $differences['total_sessions'] = [
                             'current' => $currentTotalSessions,
@@ -1444,8 +1425,8 @@ dd($currentTotalSessions,$legacyTotalSessions);
                             'therapies_number' => $legacyTherapiesNumber,
                             'total_sessions' => $legacyTotalSessions,
                             'amount' => $legacyAmount,
-                    //        'date_start' => $legacyDateStart,
-                      //      'date_end' => $legacyDateEnd,
+                            //        'date_start' => $legacyDateStart,
+                            //      'date_end' => $legacyDateEnd,
                         ]);
 
 
@@ -1538,7 +1519,7 @@ dd($currentTotalSessions,$legacyTotalSessions);
         try {
             DB::beginTransaction();
 
-            $assignedPlans = AssignedPlan::whereHas('patient', function($query) use ($request) {
+            $assignedPlans = AssignedPlan::whereHas('patient', function ($query) use ($request) {
                 $query->where('branch_id', $request->branch_id);
             })->get();
 
@@ -1548,7 +1529,7 @@ dd($currentTotalSessions,$legacyTotalSessions);
                 $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
                 $assignedPlan->services()->forceDelete();
                 $assignedPlan->ScheduledAppointments()->forceDelete();
-                $assignedPlan->voucher()->each(function($voucher) {
+                $assignedPlan->voucher()->each(function ($voucher) {
                     $voucher->plan_items()->detach();
                     $voucher->patient_items()->detach();
                 });

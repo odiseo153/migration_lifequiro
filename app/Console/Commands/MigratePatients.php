@@ -50,7 +50,9 @@ class MigratePatients extends BaseCommand
             ->get()
             ->keyBy('paciente_id');
 
-        Paciente::whereNotIn('id', Patient::pluck('id')->toArray())->
+        Paciente::
+        whereIn('centro_id', Patient::BRANCHS_TO_MIGRATE)->
+        whereNotIn('id', Patient::pluck('id')->toArray())->
             chunk(500, function ($pacientes) use ($whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
                 DB::transaction(function () use ($pacientes, $whereHeMetUsOptions, $patientGroups, $CitaTipoOld, $lastAppointments) {
                     $patientsToInsert = [];
