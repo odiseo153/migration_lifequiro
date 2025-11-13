@@ -1064,24 +1064,10 @@ class MigrationController extends Controller
             // Store original values for comparison
             $originalTherapiesNumber = $assignedPlan->therapies_number;
             $originalTotalSessions = $assignedPlan->total_sessions;
-            // Get current consumed counts
-            $currentConsumedSessions = $assignedPlan->patient->acquired_services()
-                ->whereNotNull('plan_item_id')
-                ->whereNotNull('assigned_plan_id')
-                ->whereHas('patient_plan_item', function ($query) {
-                    $query->where('type_of_item_id', ItemType::AJUSTE->value);
-                })
-                ->where('assigned_plan_id', $assignedPlan->id)
-                ->count();
 
-            $currentConsumedTherapies = $assignedPlan->patient->acquired_services()
-                ->whereNotNull('plan_item_id')
-                ->whereNotNull('assigned_plan_id')
-                ->whereHas('patient_plan_item', function ($query) {
-                    $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
-                })
-                ->where('assigned_plan_id', $assignedPlan->id)
-                ->count();
+
+            $currentConsumedSessions = $assignedPlan->sessions?->count() ?? 0;
+            $currentConsumedTherapies = $assignedPlan->therapies?->count() ?? 0;
 
             // Update basic plan data if provided
             if ($request->has('therapies_number')) {
@@ -1456,8 +1442,12 @@ class MigrationController extends Controller
         $patient = Patient::find($request->patient_id);
 
         $TypeAppointment = $request->type != 1 ? $request->type - 1 : AppointmentType::CONSULTA->value;
+        $appointment = Appointment::where('patient_id', $patient->id)
+        ->latest()
+        ->where('status_id', AppointmentStatus::COMPLETADA->value)
+        ->first();
 
-        if ($patient->appointments()->latest()->where('type_of_appointment_id', $TypeAppointment)->where('status_id', AppointmentStatus::COMPLETADA->value)->exists()) {
+        if ($appointment->type_of_appointment_id == $TypeAppointment) {
             return response()->json([
                 'success' => false,
                 'message' => 'La ultima cita del paciente es de este tipo'

@@ -1689,12 +1689,14 @@ namespace App\Models {
      * @property-read \App\Models\Patient $patient
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DescuentAuthorization> $descuentAuthorizations
      * @property-read int|null $descuentAuthorizations_count
+     * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\AcquiredService> $sessions
+     * @property-read int|null $sessions_count
+     * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\AcquiredService> $therapies
+     * @property-read int|null $therapies_count
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PlanConsume> $planConsume
      * @property-read int|null $planConsume_count
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Installment> $installments
      * @property-read int|null $installments_count
-     * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Session> $sessions
-     * @property-read int|null $sessions_count
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PlanTransaction> $transactions
      * @property-read int|null $transactions_count
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ProgrammingHistory> $ScheduledAppointments

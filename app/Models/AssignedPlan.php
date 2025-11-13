@@ -69,6 +69,24 @@ class AssignedPlan extends BaseModel
         return $this->hasMany(DescuentAuthorization::class);
     }
 
+    public function sessions()
+    {
+        return $this->hasMany(AcquiredService::class)->whereNotNull('plan_item_id')
+        ->whereNotNull('assigned_plan_id')
+        ->whereHas('patient_plan_item', function ($query) {
+            $query->where('type_of_item_id', ItemType::AJUSTE->value);
+        });
+    }
+
+    public function therapies()
+    {
+        return $this->hasMany(AcquiredService::class)->whereNotNull('plan_item_id')
+        ->whereNotNull('assigned_plan_id')
+        ->whereHas('patient_plan_item', function ($query) {
+            $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
+        });
+    }
+
     public function planConsume()
     {
         return $this->hasMany(PlanConsume::class);
@@ -79,10 +97,7 @@ class AssignedPlan extends BaseModel
         return $this->hasMany(Installment::class)->orderBy('date_paid');
     }
 
-    public function sessions()
-    {
-        return $this->hasMany(Session::class);
-    }
+
 
     public function transactions()
     {
