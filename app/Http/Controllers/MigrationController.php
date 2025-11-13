@@ -1442,12 +1442,9 @@ class MigrationController extends Controller
         $patient = Patient::find($request->patient_id);
 
         $TypeAppointment = $request->type != 1 ? $request->type - 1 : AppointmentType::CONSULTA->value;
-        $appointment = Appointment::where('patient_id', $patient->id)
-        ->latest()
-        ->where('status_id', AppointmentStatus::COMPLETADA->value)
-        ->first();
 
-        if ($appointment->type_of_appointment_id == $TypeAppointment) {
+
+        if ($patient->appointments()->latest()->where('type_of_appointment_id', $TypeAppointment)->where('status_id', AppointmentStatus::COMPLETADA->value)->exists()) {
             return response()->json([
                 'success' => false,
                 'message' => 'La ultima cita del paciente es de este tipo'
