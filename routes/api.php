@@ -8,6 +8,11 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+// Migrate patients from legacy database
+// Parameters:
+//   - patient_ids (array): IDs of patients to migrate
+//   - legacy_database (string: 'legacy' or 'produccion', default: 'legacy'): source database to read from
+//   - target_database (string: 'mysql' or 'produccion', default: 'mysql'): destination database to write to
 Route::post('/migrate-patients', [App\Http\Controllers\MigrationController::class, 'migratePatientsByIds']);
 
 // Update assigned plan endpoint
@@ -15,6 +20,13 @@ Route::put('/assigned-plans', [App\Http\Controllers\MigrationController::class, 
 Route::put('/change-type-of-patient', [App\Http\Controllers\MigrationController::class, 'changeTypeOfPatient']);
 
 // Update assigned plans from legacy database
+// Parameters:
+//   - patient_ids (array): IDs of patients
+//   - assigned_plan_ids (array): IDs of assigned plans
+//   - branch_ids (array): IDs of branches
+//   - check_all (boolean): check all plans
+//   - legacy_database (string: 'legacy' or 'produccion', default: 'legacy'): source database to read from
+//   - target_database (string: 'mysql' or 'produccion', default: 'mysql'): destination database to write to
 Route::post('/update-assigned-plans-from-legacy', [App\Http\Controllers\MigrationController::class, 'updateAssignedPlansFromLegacy']);
 Route::post('/delete-assigned-plans-for-patient-branch', [App\Http\Controllers\MigrationController::class, 'deleteAssignedPlanForPatientBranch']);
 

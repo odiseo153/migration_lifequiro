@@ -20433,6 +20433,7 @@ namespace App\Models {
     /**
      * App\Models\PatientItem
      *
+     * @property mixed $pre_authorization_item_id
      * @property mixed $ars_secure
      * @property mixed $ars_co_payment
      * @property mixed $ars_coberture
@@ -20511,6 +20512,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereArsCoberture($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereArsCoPayment($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem whereArsSecure($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem wherePreAuthorizationItemId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem name()
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<PatientItem>|PatientItem newModelQuery()

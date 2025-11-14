@@ -1,0 +1,136 @@
+### Ejemplos de uso de los endpoints de migración con selección de bases de datos origen y destino
+### Estos ejemplos pueden ser usados con extensiones como REST Client en VS Code
+
+@baseUrl = http://localhost/api
+@contentType = application/json
+
+### 1. Migrar pacientes - Por defecto (leer de legacy, escribir en mysql)
+POST {{baseUrl}}/migrate-patients
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [1, 2, 3, 4, 5]
+}
+
+### 2. Migrar pacientes - Leer de producción legacy, escribir en mysql
+POST {{baseUrl}}/migrate-patients
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [1, 2, 3, 4, 5],
+  "legacy_database": "produccion"
+}
+
+### 3. Migrar pacientes - Leer de legacy, escribir en producción
+POST {{baseUrl}}/migrate-patients
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [10, 20, 30],
+  "target_database": "produccion"
+}
+
+### 4. Migrar pacientes - Leer de producción legacy, escribir en producción
+POST {{baseUrl}}/migrate-patients
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [10, 20, 30],
+  "legacy_database": "produccion",
+  "target_database": "produccion"
+}
+
+### 5. Actualizar planes asignados - Por defecto (leer de legacy, escribir en mysql)
+POST {{baseUrl}}/update-assigned-plans-from-legacy
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [1, 2, 3]
+}
+
+### 6. Actualizar planes asignados - Leer de producción, escribir en mysql
+POST {{baseUrl}}/update-assigned-plans-from-legacy
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [1, 2, 3],
+  "legacy_database": "produccion",
+  "target_database": "mysql"
+}
+
+### 7. Actualizar planes específicos - Leer de producción, escribir en producción
+POST {{baseUrl}}/update-assigned-plans-from-legacy
+Content-Type: {{contentType}}
+
+{
+  "assigned_plan_ids": [100, 101, 102, 103],
+  "legacy_database": "produccion",
+  "target_database": "produccion"
+}
+
+### 8. Actualizar planes por branch - Leer de legacy, escribir en producción
+POST {{baseUrl}}/update-assigned-plans-from-legacy
+Content-Type: {{contentType}}
+
+{
+  "branch_ids": [1, 2],
+  "target_database": "produccion"
+}
+
+### 9. Verificar todos los planes (límite 1000) - Leer de producción, escribir en mysql
+POST {{baseUrl}}/update-assigned-plans-from-legacy
+Content-Type: {{contentType}}
+
+{
+  "check_all": true,
+  "legacy_database": "produccion"
+}
+
+### 10. Migración de un solo paciente - Por defecto
+POST {{baseUrl}}/migrate-patients
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [100]
+}
+
+### 11. Migración masiva - Leer de producción legacy, escribir en producción (50 pacientes)
+POST {{baseUrl}}/migrate-patients
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50],
+  "legacy_database": "produccion",
+  "target_database": "produccion"
+}
+
+### 12. Test de validación - valor inválido para legacy_database (debe devolver error 422)
+POST {{baseUrl}}/migrate-patients
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [1],
+  "legacy_database": "invalid_database"
+}
+
+### 13. Test de validación - valor inválido para target_database (debe devolver error 422)
+POST {{baseUrl}}/migrate-patients
+Content-Type: {{contentType}}
+
+{
+  "patient_ids": [1],
+  "target_database": "invalid_database"
+}
+
+### 12. Actualizar un plan específico (este endpoint no usa legacy_database)
+PUT {{baseUrl}}/assigned-plans
+Content-Type: {{contentType}}
+
+{
+  "patient_id": 1,
+  "therapies_number": 10,
+  "total_sessions": 20,
+  "consumed_therapies": 5,
+  "consumed_sessions": 10
+}
+

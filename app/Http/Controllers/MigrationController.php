@@ -52,13 +52,18 @@ class MigrationController extends Controller
 
         $request->validate([
             'patient_ids' => 'required|array|min:1',
-            'patient_ids.*' => 'integer'
+            'patient_ids.*' => 'integer',
+            'legacy_database' => 'nullable|string|in:legacy,produccion',
+            'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
 
         $patientIds = $request->input('patient_ids');
+        $legacyConnection = $request->input('legacy_database', 'legacy');
+        $targetConnection = $request->input('target_database', 'mysql');
 
         try {
-            DB::beginTransaction();
+            // Usar la conexión objetivo para la transacción
+            DB::connection($targetConnection)->beginTransaction();
 
             $results = [
                 'success' => true,
@@ -83,7 +88,7 @@ class MigrationController extends Controller
             foreach ($patientBatches as $batchIndex => $batch) {
                 Log::info("Procesando lote " . ($batchIndex + 1) . " de " . count($patientBatches) . " (pacientes: " . count($batch) . ")");
 
-                $batchResults = $this->migratePatients($batch, $results, $idMapping);
+                $batchResults = $this->migratePatients($batch, $results, $idMapping, $legacyConnection, $targetConnection);
                 $migratedPatients = array_merge($migratedPatients, $batchResults);
 
                 // Liberar memoria entre lotes
@@ -94,32 +99,34 @@ class MigrationController extends Controller
             if (!empty($migratedPatients)) {
                 // 2. Migrar planes asignados
 
-                $this->migratePlanes($patientIds, $results, $idMapping);
+                $this->migratePlanes($patientIds, $results, $idMapping, $legacyConnection, $targetConnection);
 
                 // 3. Migrar balance
-                $this->migrateBalance($patientIds, $results, $idMapping);
+                $this->migrateBalance($patientIds, $results, $idMapping, $legacyConnection, $targetConnection);
 
                 // 4. Migrar compras
-                $this->migrateCompras($patientIds, $results, $idMapping);
+                $this->migrateCompras($patientIds, $results, $idMapping, $legacyConnection, $targetConnection);
 
                 // 5. Migrar antecedentes
-                $this->migrateAntecedentes($patientIds, $results, $idMapping);
+                $this->migrateAntecedentes($patientIds, $results, $idMapping, $legacyConnection, $targetConnection);
 
                 // 6. Migrar historial de ajuste
-                $this->migrateHistorialAjuste($patientIds, $results, $idMapping);
+                $this->migrateHistorialAjuste($patientIds, $results, $idMapping, $legacyConnection, $targetConnection);
 
                 // 7. Migrar historial terapia física
-                $this->migrateHistorialTerapiaFisicas($patientIds, $results, $idMapping);
+                $this->migrateHistorialTerapiaFisicas($patientIds, $results, $idMapping, $legacyConnection, $targetConnection);
             }
 
-            DB::commit();
+            DB::connection($targetConnection)->commit();
 
             return response()->json($results);
 
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection($targetConnection)->rollBack();
             Log::error('Error en migración de pacientes: ' . $e->getMessage(), [
                 'patient_ids' => $patientIds,
+                'legacy_database' => $legacyConnection,
+                'target_database' => $targetConnection,
                 'trace' => $e->getTraceAsString()
             ]);
 
@@ -131,11 +138,11 @@ class MigrationController extends Controller
         }
     }
 
-    private function migratePatients(array $patientIds, array &$results, array &$idMapping)
+    private function migratePatients(array $patientIds, array &$results, array &$idMapping, string $legacyConnection = 'legacy', string $targetConnection = 'mysql')
     {
-        // Cargar datos de referencia
-        $whereHeMetUsOptions = WhereHeMetUs::all()->keyBy('id');
-        $patientGroups = PatientGroup::all()->keyBy('id');
+        // Cargar datos de referencia desde la base de datos objetivo
+        $whereHeMetUsOptions = WhereHeMetUs::on($targetConnection)->get()->keyBy('id');
+        $patientGroups = PatientGroup::on($targetConnection)->get()->keyBy('id');
 
         // Mapeo de tipos de cita
         $CitaTipoOld = [
@@ -149,8 +156,8 @@ class MigrationController extends Controller
             8 => AppointmentType::MIP->value,
         ];
 
-        // OPTIMIZACIÓN: Consulta más eficiente para últimas citas - USANDO CONEXIÓN LEGACY
-        $lastAppointments = DB::connection('legacy')->table('cita as c1')
+        // OPTIMIZACIÓN: Consulta más eficiente para últimas citas - USANDO CONEXIÓN DINÁMICA
+        $lastAppointments = DB::connection($legacyConnection)->table('cita as c1')
             ->select('c1.paciente_id', 'c1.tipo', 'c1.estado_id', 'c1.hora', 'c1.dia', 'c1.fecha')
             ->leftJoin('cita as c2', function ($join) {
                 $join->on('c1.paciente_id', '=', 'c2.paciente_id')
@@ -163,12 +170,12 @@ class MigrationController extends Controller
             ->get()
             ->keyBy('paciente_id');
 
-        // Obtener todos los pacientes legacy solicitados
-        $pacientes = Paciente::whereIn('id', $patientIds)->get();
+        // Obtener todos los pacientes legacy solicitados de la conexión especificada
+        $pacientes = Paciente::on($legacyConnection)->whereIn('id', $patientIds)->get();
 
-        // OPTIMIZACIÓN: Pre-cargar pacientes existentes para evitar consultas N+1
-        $existingPatientIds = Patient::whereIn('id', $patientIds)->pluck('id')->toArray();
-        $existingPatientsByName = Patient::select('id', 'first_name', 'last_name')
+        // OPTIMIZACIÓN: Pre-cargar pacientes existentes para evitar consultas N+1 desde base de datos objetivo
+        $existingPatientIds = Patient::on($targetConnection)->whereIn('id', $patientIds)->pluck('id')->toArray();
+        $existingPatientsByName = Patient::on($targetConnection)->select('id', 'first_name', 'last_name')
             ->get()
             ->mapWithKeys(function ($patient) {
                 $fullName = strtolower(trim($patient->first_name . ' ' . $patient->last_name));
@@ -276,13 +283,13 @@ class MigrationController extends Controller
             }
         }
 
-        // OPTIMIZACIÓN: Insertar pacientes en lotes más pequeños para evitar timeouts
+        // OPTIMIZACIÓN: Insertar pacientes en lotes más pequeños para evitar timeouts en la base de datos objetivo
         if (!empty($patientsToInsert)) {
             $insertBatchSize = 50; // Lotes más pequeños para inserción
             $patientChunks = array_chunk($patientsToInsert, $insertBatchSize);
 
             foreach ($patientChunks as $chunk) {
-                Patient::upsert($chunk, ['id'], [
+                Patient::on($targetConnection)->upsert($chunk, ['id'], [
                     'email',
                     'identity_document',
                     'first_name',
@@ -305,10 +312,10 @@ class MigrationController extends Controller
             $results['migrated_patients'] += count($patientsToInsert);
         }
 
-        // OPTIMIZACIÓN: Insertar citas en lotes
+        // OPTIMIZACIÓN: Insertar citas en lotes en la base de datos objetivo
         if (!empty($appointmentsToInsert)) {
             $appointmentPatientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
-            $existingPatientIds = Patient::whereIn('id', $appointmentPatientIds)->pluck('id')->toArray();
+            $existingPatientIds = Patient::on($targetConnection)->whereIn('id', $appointmentPatientIds)->pluck('id')->toArray();
 
             $validAppointments = collect($appointmentsToInsert)->filter(function ($appointment) use ($existingPatientIds) {
                 return in_array($appointment['patient_id'], $existingPatientIds);
@@ -317,7 +324,7 @@ class MigrationController extends Controller
             if (!empty($validAppointments)) {
                 $appointmentChunks = array_chunk($validAppointments, $insertBatchSize);
                 foreach ($appointmentChunks as $chunk) {
-                    Appointment::insert($chunk);
+                    Appointment::on($targetConnection)->insert($chunk);
                 }
                 $results['migrated_appointments'] += count($validAppointments);
             }
@@ -326,14 +333,14 @@ class MigrationController extends Controller
         return $migratedPatients;
     }
 
-    private function migratePlanes(array $patientIds, array &$results, array $idMapping)
+    private function migratePlanes(array $patientIds, array &$results, array $idMapping, string $legacyConnection = 'legacy', string $targetConnection = 'mysql')
     {
-        $planesAsignados = Ajuste::whereIn('paciente_id', $patientIds)
-            ->whereIn('plan_id', Plan::whereNotIn('id', $this->ignored_plan)->pluck('id')->toArray())
+        $planesAsignados = Ajuste::on($legacyConnection)->whereIn('paciente_id', $patientIds)
+            ->whereIn('plan_id', Plan::on($targetConnection)->whereNotIn('id', $this->ignored_plan)->pluck('id')->toArray())
             ->whereIn('estado', [1, 2, 3])
             ->get();
 
-        $user = User::first();
+        $user = User::on($targetConnection)->first();
         $planStatusMatch = [
             1 => PlanStatus::Activo->value,
             2 => PlanStatus::Expirado->value,
@@ -343,7 +350,8 @@ class MigrationController extends Controller
 
         foreach ($planesAsignados as $p) {
             try {
-                if (!Plan::find($p->plan_id)) {
+                $planFound = Plan::on($targetConnection)->find($p->plan_id);
+                if (!$planFound) {
                     $results['errors'][] = "Plan no encontrado - ID: {$p->plan_id}";
                     continue;
                 }
@@ -357,24 +365,24 @@ class MigrationController extends Controller
                 // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
                 $finalPatientId = $idMapping[$p->paciente_id];
 
-                // Verificar que el paciente exista en la nueva base de datos
-                if (!Patient::find($finalPatientId)) {
+                // Verificar que el paciente exista en la nueva base de datos objetivo
+                if (!Patient::on($targetConnection)->find($finalPatientId)) {
                     $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$p->paciente_id}) no existe en la BD, saltando plan {$p->id}";
                     continue;
                 }
 
-                $assignedPlan = AssignedPlan::create([
+                $assignedPlan = AssignedPlan::on($targetConnection)->create([
                     'id' => $p->id,
                     'plan_id' => $p->plan_id,
                     'patient_id' => $finalPatientId,
                     'date_start' => $this->parseDate($p->fecha_ciclo_insertada),
                     'date_end' => $this->parseDate($p->fecha_expiracion),
-                    'plan_name' => Plan::find($p->plan_id)->name ?? 'Plan ' . $this->generateRandomCode(AssignedPlan::class, 8, 'plan_name'),
+                    'plan_name' => $planFound->name ?? 'Plan ' . $this->generateRandomCode(AssignedPlan::class, 8, 'plan_name'),
                     'paid_type' => 1,
                     'amount' => $p->costo,
                     'therapies_number' => $p->terapias_fisicas,
                     'total_sessions' => $p->ajustes,
-                    'number_installments' => Plan::find($p->plan_id)->number_installments ?? 0,
+                    'number_installments' => $planFound->number_installments ?? 0,
                     'status' => $planStatusMatch[$p->estado],
                     'branch_id' => $p->centro_id,
                     'user_id' => $user->id,
@@ -396,7 +404,7 @@ class MigrationController extends Controller
 
                 // Crear descuento si existe
                 if ($p->descuento != 0) {
-                    DescuentAuthorization::create([
+                    DescuentAuthorization::on($targetConnection)->create([
                         'patient_id' => $finalPatientId,
                         'assigned_plan_id' => $assignedPlan->id,
                         'type' => 1,
@@ -412,7 +420,7 @@ class MigrationController extends Controller
                 }
 
                 // Crear vouchers y servicios adquiridos
-                $this->createVouchersAndServices($assignedPlan, $p, $finalPatientId);
+                $this->createVouchersAndServices($assignedPlan, $p, $finalPatientId, $targetConnection);
 
                 $results['migrated_plans']++;
 
@@ -422,15 +430,15 @@ class MigrationController extends Controller
         }
     }
 
-    private function createVouchersAndServices($assignedPlan, $p, $finalPatientId)
+    private function createVouchersAndServices($assignedPlan, $p, $finalPatientId, string $targetConnection = 'mysql')
     {
         // Calcular precio por ítem
         $total_items = $assignedPlan->plan->total_sessions + $assignedPlan->therapies_number;
         $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
 
-        // Crear vouchers
+        // Crear vouchers en base de datos objetivo
         if ($p->consumido > 0) {
-            Voucher::create([
+            Voucher::on($targetConnection)->create([
                 'assigned_plan_id' => $assignedPlan->id,
                 'status' => 3,
                 'quantity' => 1,
@@ -439,13 +447,13 @@ class MigrationController extends Controller
             ]);
         }
 
-        // Crear servicios adquiridos para ajustes
+        // Crear servicios adquiridos para ajustes en base de datos objetivo
         if ($p->sesiones_utilizadas != 0) {
-            $itemAjuste = Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first();
+            $itemAjuste = Item::on($targetConnection)->where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first();
             $sessiones = (int) $p->sesiones_utilizadas;
 
             for ($i = 0; $i < $sessiones; $i++) {
-                AcquiredService::create([
+                AcquiredService::on($targetConnection)->create([
                     'patient_id' => $finalPatientId,
                     'assigned_plan_id' => $assignedPlan->id,
                     'plan_item_id' => $itemAjuste->id,
@@ -455,13 +463,13 @@ class MigrationController extends Controller
             }
         }
 
-        // Crear servicios adquiridos para terapias
+        // Crear servicios adquiridos para terapias en base de datos objetivo
         if ($p->terapias_utilizadas != 0) {
-            $itemTerapia = Item::where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first();
+            $itemTerapia = Item::on($targetConnection)->where('plan', true)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first();
             $terapias = (int) $p->terapias_utilizadas;
 
             for ($i = 0; $i < $terapias; $i++) {
-                AcquiredService::create([
+                AcquiredService::on($targetConnection)->create([
                     'patient_id' => $finalPatientId,
                     'assigned_plan_id' => $assignedPlan->id,
                     'plan_item_id' => $itemTerapia->id,
@@ -472,12 +480,12 @@ class MigrationController extends Controller
         }
     }
 
-    private function migrateBalance(array $patientIds, array &$results, array $idMapping)
+    private function migrateBalance(array $patientIds, array &$results, array $idMapping, string $legacyConnection = 'legacy', string $targetConnection = 'mysql')
     {
-        $balances = Balance::where('monto', '>', 0)
+        $balances = Balance::on($legacyConnection)->where('monto', '>', 0)
             ->where('estado', 1)
             ->whereIn('paciente_id', $patientIds)
-            ->whereNotIn('id', CreditNote::pluck('id')->toArray())
+            ->whereNotIn('id', CreditNote::on($targetConnection)->pluck('id')->toArray())
             ->get();
 
         foreach ($balances as $balance) {
@@ -491,13 +499,13 @@ class MigrationController extends Controller
                 // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
                 $finalPatientId = $idMapping[$balance->paciente_id];
 
-                // Verificar que el paciente exista en la nueva base de datos
-                if (!Patient::find($finalPatientId)) {
+                // Verificar que el paciente exista en la base de datos objetivo
+                if (!Patient::on($targetConnection)->find($finalPatientId)) {
                     $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$balance->paciente_id}) no existe en la BD, saltando balance {$balance->id}";
                     continue;
                 }
 
-                CreditNote::create([
+                CreditNote::on($targetConnection)->create([
                     'id' => $balance->id,
                     'patient_id' => $finalPatientId,
                     'amount' => $balance->monto,
@@ -513,7 +521,7 @@ class MigrationController extends Controller
         }
     }
 
-    private function migrateCompras(array $patientIds, array &$results, array $idMapping)
+    private function migrateCompras(array $patientIds, array &$results, array $idMapping, string $legacyConnection = 'legacy', string $targetConnection = 'mysql')
     {
         $comprasTipo = [
             1 => ItemType::CONSULTA->value,
@@ -527,7 +535,7 @@ class MigrationController extends Controller
             9 => ItemType::TERAPIA_FISICA->value,
         ];
 
-        $compras = Compra::where('estado', 1)
+        $compras = Compra::on($legacyConnection)->where('estado', 1)
             ->where('tipo_servicio', '!=', 0)
             ->whereIn('paciente_id', $patientIds)
             ->get();
@@ -543,20 +551,20 @@ class MigrationController extends Controller
                 // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
                 $finalPatientId = $idMapping[$compra->paciente_id];
 
-                // Verificar que el paciente exista en la nueva base de datos
-                if (!Patient::find($finalPatientId)) {
+                // Verificar que el paciente exista en la base de datos objetivo
+                if (!Patient::on($targetConnection)->find($finalPatientId)) {
                     $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$compra->paciente_id}) no existe en la BD, saltando compra {$compra->id}";
                     continue;
                 }
 
-                $item = Item::where('type_of_item_id', $comprasTipo[$compra->tipo_servicio])->first();
+                $item = Item::on($targetConnection)->where('type_of_item_id', $comprasTipo[$compra->tipo_servicio])->first();
                 if (!$item) {
-                    $item = Item::factory()->create([
+                    $item = Item::on($targetConnection)->factory()->create([
                         'type_of_item_id' => $comprasTipo[$compra->tipo_servicio],
                     ]);
                 }
 
-                PatientItem::updateOrCreate(
+                PatientItem::on($targetConnection)->updateOrCreate(
                     ['id' => $compra->id],
                     [
                         'id' => $compra->id,
@@ -577,10 +585,10 @@ class MigrationController extends Controller
         }
     }
 
-    private function migrateAntecedentes(array $patientIds, array &$results, array $idMapping)
+    private function migrateAntecedentes(array $patientIds, array &$results, array $idMapping, string $legacyConnection = 'legacy', string $targetConnection = 'mysql')
     {
-        $antecedentes = Antecedente::whereIn('paciente_id', $patientIds)
-            ->whereNotIn('paciente_id', MedicalRecord::pluck('patient_id')->toArray())
+        $antecedentes = Antecedente::on($legacyConnection)->whereIn('paciente_id', $patientIds)
+            ->whereNotIn('paciente_id', MedicalRecord::on($targetConnection)->pluck('patient_id')->toArray())
             ->get();
 
         foreach ($antecedentes as $antecedente) {
@@ -594,14 +602,14 @@ class MigrationController extends Controller
                 // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
                 $finalPatientId = $idMapping[$antecedente->paciente_id];
 
-                // Verificar que el paciente exista en la nueva base de datos
-                $patient = Patient::find($finalPatientId);
+                // Verificar que el paciente exista en la base de datos objetivo
+                $patient = Patient::on($targetConnection)->find($finalPatientId);
                 if (!$patient) {
                     $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$antecedente->paciente_id}) no existe en la BD, saltando antecedente {$antecedente->id}";
                     continue;
                 }
 
-                MedicalRecord::create([
+                MedicalRecord::on($targetConnection)->create([
                     'patient_id' => $patient->id,
                     'id' => $antecedente->id,
                     'consultation_reason' => $antecedente->motivo_consulta,
@@ -618,9 +626,9 @@ class MigrationController extends Controller
         }
     }
 
-    private function migrateHistorialAjuste(array $patientIds, array &$results, array $idMapping)
+    private function migrateHistorialAjuste(array $patientIds, array &$results, array $idMapping, string $legacyConnection = 'legacy', string $targetConnection = 'mysql')
     {
-        $historiales = HistorialAjuste::whereIn('paciente_id', $patientIds)->get();
+        $historiales = HistorialAjuste::on($legacyConnection)->whereIn('paciente_id', $patientIds)->get();
 
         foreach ($historiales as $historial) {
             try {
@@ -633,20 +641,20 @@ class MigrationController extends Controller
                 // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
                 $finalPatientId = $idMapping[$historial->paciente_id];
 
-                // Verificar que el paciente exista en la nueva base de datos
-                if (!Patient::find($finalPatientId)) {
+                // Verificar que el paciente exista en la base de datos objetivo
+                if (!Patient::on($targetConnection)->find($finalPatientId)) {
                     $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$historial->paciente_id}) no existe en la BD, saltando historial ajuste {$historial->id}";
                     continue;
                 }
 
-                $item = Item::where('type_of_item_id', ItemType::AJUSTE->value)->first();
+                $item = Item::on($targetConnection)->where('type_of_item_id', ItemType::AJUSTE->value)->first();
                 if (!$item) {
-                    $item = Item::factory()->create([
+                    $item = Item::on($targetConnection)->factory()->create([
                         'type_of_item_id' => ItemType::AJUSTE->value,
                     ]);
                 }
 
-                $service = PatientItem::create([
+                $service = PatientItem::on($targetConnection)->create([
                     'id' => $historial->service_id,
                     'patient_id' => $finalPatientId,
                     'item_id' => $item->id,
@@ -656,9 +664,9 @@ class MigrationController extends Controller
                     'created_at' => $historial->fecha,
                 ]);
 
-                $room = Room::inRandomOrder()->first() ?? Room::factory()->create();
-                $bed = Bed::inRandomOrder()->first() ?? Bed::factory()->create();
-                $user = User::inRandomOrder()->first() ?? User::factory()->create();
+                $room = Room::on($targetConnection)->inRandomOrder()->first() ?? Room::on($targetConnection)->factory()->create();
+                $bed = Bed::on($targetConnection)->inRandomOrder()->first() ?? Bed::on($targetConnection)->factory()->create();
+                $user = User::on($targetConnection)->inRandomOrder()->first() ?? User::on($targetConnection)->factory()->create();
 
                 $service->waiting_room()->create([
                     'patient_id' => $finalPatientId,
@@ -668,7 +676,7 @@ class MigrationController extends Controller
                     'created_at' => $historial->fecha,
                 ]);
 
-                $acquiredService = AcquiredService::create([
+                $acquiredService = AcquiredService::on($targetConnection)->create([
                     'patient_id' => $finalPatientId,
                     'price' => $item->price,
                     'status' => ServicesStatus::COMPLETADA->value,
@@ -677,7 +685,7 @@ class MigrationController extends Controller
                 ]);
 
                 // Procesar zonas de vertebras
-                $this->processVertebrae($historial, $service, $acquiredService, $finalPatientId);
+                $this->processVertebrae($historial, $service, $acquiredService, $finalPatientId, $targetConnection);
 
                 $results['migrated_adjustments']++;
 
@@ -687,7 +695,7 @@ class MigrationController extends Controller
         }
     }
 
-    private function processVertebrae($historial, $service, $acquiredService, $finalPatientId)
+    private function processVertebrae($historial, $service, $acquiredService, $finalPatientId, string $targetConnection = 'mysql')
     {
         $cervicalVertebrae = [];
         $thoracicVertebrae = [];
@@ -724,7 +732,7 @@ class MigrationController extends Controller
             }
         }
 
-        MedicalAjusteModule::updateOrCreate(
+        MedicalAjusteModule::on($targetConnection)->updateOrCreate(
             ['id' => $historial->id],
             [
                 'id' => $historial->id,
@@ -740,35 +748,35 @@ class MigrationController extends Controller
         );
     }
 
-    private function migrateHistorialTerapiaFisicas(array $patientIds, array &$results, array $idMapping)
+    private function migrateHistorialTerapiaFisicas(array $patientIds, array &$results, array $idMapping, string $legacyConnection = 'legacy', string $targetConnection = 'mysql')
     {
         $itemsMatchTerapiaFisica = [
-            1 => PhysicalTherapyCategory::find(48)?->id,
-            2 => PhysicalTherapyCategory::find(51)?->id,
-            3 => PhysicalTherapyCategory::find(765)?->id,
-            4 => PhysicalTherapyCategory::find(765)?->id,
-            5 => PhysicalTherapyCategory::find(741)?->id,
-            6 => PhysicalTherapyCategory::find(742)?->id,
-            8 => PhysicalTherapyCategory::find(60)?->id,
-            9 => PhysicalTherapyCategory::find(739)?->id,
-            10 => PhysicalTherapyCategory::find(739)?->id,
-            11 => PhysicalTherapyCategory::find(890)?->id,
-            12 => PhysicalTherapyCategory::find(871)?->id,
-            13 => PhysicalTherapyCategory::find(872)?->id,
-            14 => PhysicalTherapyCategory::find(947)?->id,
-            15 => PhysicalTherapyCategory::find(817)?->id,
-            16 => PhysicalTherapyCategory::find(793)?->id,
-            17 => PhysicalTherapyCategory::find(794)?->id,
-            18 => PhysicalTherapyCategory::find(91)?->id,
-            19 => PhysicalTherapyCategory::find(91)?->id,
-            20 => PhysicalTherapyCategory::find(921)?->id,
-            21 => PhysicalTherapyCategory::find(921)?->id,
-            22 => PhysicalTherapyCategory::find(897)?->id,
-            23 => PhysicalTherapyCategory::find(898)?->id,
+            1 => PhysicalTherapyCategory::on($targetConnection)->find(48)?->id,
+            2 => PhysicalTherapyCategory::on($targetConnection)->find(51)?->id,
+            3 => PhysicalTherapyCategory::on($targetConnection)->find(765)?->id,
+            4 => PhysicalTherapyCategory::on($targetConnection)->find(765)?->id,
+            5 => PhysicalTherapyCategory::on($targetConnection)->find(741)?->id,
+            6 => PhysicalTherapyCategory::on($targetConnection)->find(742)?->id,
+            8 => PhysicalTherapyCategory::on($targetConnection)->find(60)?->id,
+            9 => PhysicalTherapyCategory::on($targetConnection)->find(739)?->id,
+            10 => PhysicalTherapyCategory::on($targetConnection)->find(739)?->id,
+            11 => PhysicalTherapyCategory::on($targetConnection)->find(890)?->id,
+            12 => PhysicalTherapyCategory::on($targetConnection)->find(871)?->id,
+            13 => PhysicalTherapyCategory::on($targetConnection)->find(872)?->id,
+            14 => PhysicalTherapyCategory::on($targetConnection)->find(947)?->id,
+            15 => PhysicalTherapyCategory::on($targetConnection)->find(817)?->id,
+            16 => PhysicalTherapyCategory::on($targetConnection)->find(793)?->id,
+            17 => PhysicalTherapyCategory::on($targetConnection)->find(794)?->id,
+            18 => PhysicalTherapyCategory::on($targetConnection)->find(91)?->id,
+            19 => PhysicalTherapyCategory::on($targetConnection)->find(91)?->id,
+            20 => PhysicalTherapyCategory::on($targetConnection)->find(921)?->id,
+            21 => PhysicalTherapyCategory::on($targetConnection)->find(921)?->id,
+            22 => PhysicalTherapyCategory::on($targetConnection)->find(897)?->id,
+            23 => PhysicalTherapyCategory::on($targetConnection)->find(898)?->id,
         ];
 
-        $historiales = HistorialTerapia::whereIn('paciente_id', $patientIds)
-            ->whereNotIn('id', MedicalTerapiaTracionModule::pluck('id')->toArray())
+        $historiales = HistorialTerapia::on($legacyConnection)->whereIn('paciente_id', $patientIds)
+            ->whereNotIn('id', MedicalTerapiaTracionModule::on($targetConnection)->pluck('id')->toArray())
             ->get();
 
         foreach ($historiales as $historial) {
@@ -782,26 +790,26 @@ class MigrationController extends Controller
                 // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
                 $finalPatientId = $idMapping[$historial->paciente_id];
 
-                // Verificar que el paciente exista en la nueva base de datos
-                if (!Patient::find($finalPatientId)) {
+                // Verificar que el paciente exista en la base de datos objetivo
+                if (!Patient::on($targetConnection)->find($finalPatientId)) {
                     $results['errors'][] = "Paciente con ID final {$finalPatientId} (ID viejo: {$historial->paciente_id}) no existe en la BD, saltando historial terapia {$historial->id}";
                     continue;
                 }
 
-                $user = User::find($historial->user_id);
+                $user = User::on($targetConnection)->find($historial->user_id);
                 if (!$user) {
                     $results['errors'][] = "Usuario no encontrado para historial terapia - ID: {$historial->user_id}";
                     continue;
                 }
 
-                $item = Item::where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first();
+                $item = Item::on($targetConnection)->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)->first();
                 if (!$item) {
-                    $item = Item::factory()->create([
+                    $item = Item::on($targetConnection)->factory()->create([
                         'type_of_item_id' => ItemType::TERAPIA_FISICA->value,
                     ]);
                 }
 
-                $service = PatientItem::create([
+                $service = PatientItem::on($targetConnection)->create([
                     'id' => $historial->service_id,
                     'patient_id' => $finalPatientId,
                     'item_id' => $item->id,
@@ -811,8 +819,8 @@ class MigrationController extends Controller
                     'created_at' => $historial->fecha,
                 ]);
 
-                $room = Room::inRandomOrder()->first() ?? Room::factory()->create();
-                $bed = Bed::inRandomOrder()->first() ?? Bed::factory()->create();
+                $room = Room::on($targetConnection)->inRandomOrder()->first() ?? Room::on($targetConnection)->factory()->create();
+                $bed = Bed::on($targetConnection)->inRandomOrder()->first() ?? Bed::on($targetConnection)->factory()->create();
 
                 $service->waiting_room()->create([
                     'patient_id' => $finalPatientId,
@@ -822,7 +830,7 @@ class MigrationController extends Controller
                     'created_at' => $historial->fecha,
                 ]);
 
-                $acquiredService = AcquiredService::create([
+                $acquiredService = AcquiredService::on($targetConnection)->create([
                     'patient_id' => $finalPatientId,
                     'price' => $item->price,
                     'status' => ServicesStatus::COMPLETADA->value,
@@ -832,7 +840,7 @@ class MigrationController extends Controller
 
                 $categories = explode(',', $historial->tipo_terapia);
 
-                $medicalTerapiaTracionModule = MedicalTerapiaTracionModule::updateOrCreate(
+                $medicalTerapiaTracionModule = MedicalTerapiaTracionModule::on($targetConnection)->updateOrCreate(
                     ['id' => $historial->id],
                     [
                         'id' => $historial->id,
@@ -1292,10 +1300,15 @@ class MigrationController extends Controller
             'assigned_plan_ids.*' => 'integer',
             'branch_ids' => 'array',
             'branch_ids.*' => 'integer',
-            'check_all' => 'boolean'
+            'check_all' => 'boolean',
+            'legacy_database' => 'nullable|string|in:legacy,produccion',
+            'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
 
-            DB::beginTransaction();
+            $legacyConnection = $request->input('legacy_database', 'legacy');
+            $targetConnection = $request->input('target_database', 'mysql');
+
+            DB::connection($targetConnection)->beginTransaction();
 
             $results = [
                 'success' => true,
@@ -1305,21 +1318,21 @@ class MigrationController extends Controller
                 'errors' => []
             ];
 
-            // Determinar qué planes revisar
+            // Determinar qué planes revisar desde la base de datos objetivo
             if ($request->has('assigned_plan_ids') && !empty($request->assigned_plan_ids)) {
                 // Revisar planes específicos
-                $assignedPlans = AssignedPlan::whereIn('id', $request->assigned_plan_ids)->get();
+                $assignedPlans = AssignedPlan::on($targetConnection)->whereIn('id', $request->assigned_plan_ids)->get();
             } elseif ($request->has('patient_ids') && !empty($request->patient_ids)) {
                 // Revisar planes de pacientes específicos
-                $assignedPlans = AssignedPlan::whereIn('patient_id', $request->patient_ids)->get();
+                $assignedPlans = AssignedPlan::on($targetConnection)->whereIn('patient_id', $request->patient_ids)->get();
             } elseif ($request->has('branch_ids') && !empty($request->branch_ids)) {
                 // Revisar planes de pacientes por branch_id
-                $assignedPlans = AssignedPlan::whereHas('patient', function ($query) use ($request) {
+                $assignedPlans = AssignedPlan::on($targetConnection)->whereHas('patient', function ($query) use ($request) {
                     $query->whereIn('branch_id', $request->branch_ids);
                 })->get();
             } elseif ($request->check_all) {
                 // Revisar todos los planes (con límite de seguridad)
-                $assignedPlans = AssignedPlan::limit(1000)->get();
+                $assignedPlans = AssignedPlan::on($targetConnection)->limit(1000)->get();
             } else {
                 return response()->json([
                     'success' => false,
@@ -1330,8 +1343,8 @@ class MigrationController extends Controller
             foreach ($assignedPlans as $assignedPlan) {
                     $results['checked_plans']++;
 
-                    // Buscar el plan en la base de datos legacy
-                    $legacyPlan = Ajuste::where('id', $assignedPlan->id)->first();
+                    // Buscar el plan en la base de datos legacy especificada
+                    $legacyPlan = Ajuste::on($legacyConnection)->where('id', $assignedPlan->id)->first();
 
                     if (!$legacyPlan) {
                         $results['errors'][] = "Plan asignado {$assignedPlan->id} no encontrado en base de datos legacy";
@@ -1426,7 +1439,7 @@ class MigrationController extends Controller
 
             }
 
-            DB::commit();
+            DB::connection($targetConnection)->commit();
 
             return response()->json($results);
 
@@ -1437,21 +1450,24 @@ class MigrationController extends Controller
         $request->validate([
             'patient_id' => 'required|integer|exists:patients,id',
             'type' => 'required|integer|exists:type_of_appointments,id|in:1,2,3,4',
+           'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
 
-        $patient = Patient::find($request->patient_id);
+            $targetConnection = $request->input('target_database', 'mysql');
+
+        $patient = Patient::on($targetConnection)->find($request->patient_id);
 
         $TypeAppointment = $request->type != 1 ? $request->type - 1 : AppointmentType::CONSULTA->value;
 
 
-        if ($patient->appointments()->latest()->where('type_of_appointment_id', $TypeAppointment)->where('status_id', AppointmentStatus::COMPLETADA->value)->exists()) {
+        if ($patient->appointments()->latest()->where('type_of_appointment_id', $TypeAppointment)->where('status_id', AppointmentStatus::COMPLETADA->value)->first()) {
             return response()->json([
                 'success' => false,
                 'message' => 'La ultima cita del paciente es de este tipo'
             ], 400);
         }
 
-        Appointment::create([
+        Appointment::on($targetConnection)->create([
             'note' => 'Cita de migración agregada manualmente',
             'patient_id' => $patient->id,
             'branch_id' => $patient->branch_id,
@@ -1478,7 +1494,10 @@ class MigrationController extends Controller
         $request->validate([
             'branch_id' => 'required|integer|exists:branches,id',
             'count' => 'required|integer',
+            'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
+
+        $targetConnection = $request->input('target_database', 'mysql');
 
         $batchSize = 20; // Reduce el tamaño del lote para evitar sobrecargar la ejecución
 
@@ -1488,14 +1507,14 @@ class MigrationController extends Controller
             // NO uses transacciones grandes con operaciones de mucha duración y borrados en lote de datos masivos
 
             // Recorre lote a lote fuera de una transacción global (más seguro para grandes cantidades)
-            AssignedPlan::whereHas('patient', function ($query) use ($request) {
+            AssignedPlan::on($targetConnection)->whereHas('patient', function ($query) use ($request) {
                 $query->where('branch_id', $request->branch_id);
             })
             ->limit($request->count)
-            ->chunkById($batchSize, function ($assignedPlans) use (&$totalDeleted) {
+            ->chunkById($batchSize, function ($assignedPlans) use (&$totalDeleted, $targetConnection) {
                 foreach ($assignedPlans as $assignedPlan) {
                     try {
-                        DB::beginTransaction();
+                        DB::connection($targetConnection)->beginTransaction();
 
                         // Eliminar las relaciones y datos dependientes de manera adecuada
                         $assignedPlan->installments()->forceDelete();
@@ -1514,9 +1533,9 @@ class MigrationController extends Controller
 
                         $totalDeleted++;
 
-                        DB::commit();
+                        DB::connection($targetConnection)->commit();
                     } catch (\Throwable $inner) {
-                        DB::rollBack();
+                        DB::connection($targetConnection)->rollBack();
                         Log::error('Error eliminando plan asignado (por lote): ' . $inner->getMessage(), [
                             'assigned_plan_id' => $assignedPlan->id,
                             'trace' => $inner->getTraceAsString()
