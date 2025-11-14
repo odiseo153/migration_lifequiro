@@ -1038,8 +1038,11 @@ class MigrationController extends Controller
      */
     public function updateAssignedPlan(Request $request)
     {
+        // Obtener la conexión objetivo primero
+        $targetConnection = $request->input('target_database', 'mysql');
+
         $request->validate([
-            'patient_id' => 'required|integer|exists:patients,id',
+            'patient_id' => 'required|integer|exists:' . $targetConnection . '.patients,id',
             'therapies_number' => 'nullable|integer|min:0',
             'consumed_therapies' => 'nullable|integer|min:0',
             'total_sessions' => 'nullable|integer|min:0',
@@ -1053,13 +1056,14 @@ class MigrationController extends Controller
             'balance' => 'nullable|numeric|min:0',
             'paid' => 'nullable|numeric|min:0',
             'descuent' => 'nullable|numeric|min:0',
+            'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection($targetConnection)->beginTransaction();
 
             // Find the assigned plan
-            $assignedPlan = AssignedPlan::with(['plan', 'patient', 'services', 'voucher'])
+            $assignedPlan = AssignedPlan::on($targetConnection)->with(['plan', 'patient', 'services', 'voucher'])
                 ->where('patient_id', $request->patient_id)
                 ->first();
 
@@ -1099,19 +1103,19 @@ class MigrationController extends Controller
             }
 
             if ($request->has('consume')) {
-                $this->updatePlanConsume($assignedPlan, $request->consume);
+                $this->updatePlanConsume($assignedPlan, $request->consume, $targetConnection);
             }
 
             if ($request->has('balance')) {
-                $this->updatePlanBalance($assignedPlan, $request->balance);
+                $this->updatePlanBalance($assignedPlan, $request->balance, $targetConnection);
             }
 
             if ($request->has('descuent')) {
                 //  $descuents = $assignedPlan->descuentAuthorizations()->whereIn('status', [AuthorizationStatus::AUTORIZADO->value, AuthorizationStatus::APROBADO->value])->get();
 
-                $user = Role::find(1)->users()->first();
+                $user = Role::on($targetConnection)->find(1)->users()->first();
 
-                DescuentAuthorization::create([
+                DescuentAuthorization::on($targetConnection)->create([
                     'patient_id' => $assignedPlan->patient_id,
                     'assigned_plan_id' => $assignedPlan->id,
                     'type' => 1,
@@ -1135,13 +1139,13 @@ class MigrationController extends Controller
 
                 if ($sessionsDifference > 0) {
                     // Need to add more consumed sessions
-                    $itemAjuste = Item::where('plan', true)
+                    $itemAjuste = Item::on($targetConnection)->where('plan', true)
                         ->where('type_of_item_id', ItemType::AJUSTE->value)
                         ->first();
 
                     if ($itemAjuste) {
                         for ($i = 0; $i < $sessionsDifference; $i++) {
-                            AcquiredService::create([
+                            AcquiredService::on($targetConnection)->create([
                                 'patient_id' => $assignedPlan->patient_id,
                                 'assigned_plan_id' => $assignedPlan->id,
                                 'plan_item_id' => $itemAjuste->id,
@@ -1179,13 +1183,13 @@ class MigrationController extends Controller
 
                 if ($therapiesDifference > 0) {
                     // Need to add more consumed therapies
-                    $itemTerapia = Item::where('plan', true)
+                    $itemTerapia = Item::on($targetConnection)->where('plan', true)
                         ->where('type_of_item_id', ItemType::TERAPIA_FISICA->value)
                         ->first();
 
                     if ($itemTerapia) {
                         for ($i = 0; $i < $therapiesDifference; $i++) {
-                            AcquiredService::create([
+                            AcquiredService::on($targetConnection)->create([
                                 'patient_id' => $assignedPlan->patient_id,
                                 'assigned_plan_id' => $assignedPlan->id,
                                 'plan_item_id' => $itemTerapia->id,
@@ -1218,7 +1222,7 @@ class MigrationController extends Controller
 
             // Update vouchers if amount or consumed items changed
             if ($request->has('amount') || $request->has('consumed_sessions') || $request->has('consumed_therapies')) {
-                $this->updateVouchers($assignedPlan, $item_price);
+                $this->updateVouchers($assignedPlan, $item_price, $targetConnection);
             }
 
             // Save the assigned plan
@@ -1227,7 +1231,7 @@ class MigrationController extends Controller
             // Check if plan is completed
             $assignedPlan->isCompleted();
 
-            DB::commit();
+            DB::connection($targetConnection)->commit();
 
             // Reload with fresh data
             $assignedPlan->load(['services', 'voucher']);
@@ -1273,10 +1277,11 @@ class MigrationController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection($targetConnection)->rollBack();
             Log::error('Error actualizando plan asignado: ' . $e->getMessage(), [
-                'assigned_plan_id' => $assignedPlan->id,
-                'patient_id' => $assignedPlan->patient_id,
+                'assigned_plan_id' => $assignedPlan->id ?? null,
+                'patient_id' => $assignedPlan->patient_id ?? null,
+                'target_database' => $targetConnection,
                 'request' => $request->all(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -1447,13 +1452,14 @@ class MigrationController extends Controller
 
     public function changeTypeOfPatient(Request $request)
     {
-        $request->validate([
-            'patient_id' => 'required|integer|exists:patients,id',
-            'type' => 'required|integer|exists:type_of_appointments,id|in:1,2,3,4',
-           'target_database' => 'nullable|string|in:mysql,produccion'
-        ]);
+        // Obtener la conexión objetivo primero
+        $targetConnection = $request->input('target_database', 'mysql');
 
-            $targetConnection = $request->input('target_database', 'mysql');
+        $request->validate([
+            'patient_id' => 'required|integer|exists:' . $targetConnection . '.patients,id',
+            'type' => 'required|integer|exists:' . $targetConnection . '.type_of_appointments,id|in:1,2,3,4',
+            'target_database' => 'nullable|string|in:mysql,produccion'
+        ]);
 
         $patient = Patient::on($targetConnection)->find($request->patient_id);
 
@@ -1480,7 +1486,7 @@ class MigrationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Tipo de paciente cambiado exitosamente, ahora es de tipo ' . TypeOfAppointments::find($TypeAppointment + 1)->name
+            'message' => 'Tipo de paciente cambiado exitosamente, ahora es de tipo ' . TypeOfAppointments::on($targetConnection)->find($TypeAppointment + 1)->name
         ], 200);
 
     }
@@ -1491,13 +1497,14 @@ class MigrationController extends Controller
         ini_set('memory_limit', '2G');
         ini_set('max_execution_time', 600); // Aumenta a 10 minutos (ajusta si es necesario)
 
+        // Obtener la conexión objetivo primero
+        $targetConnection = $request->input('target_database', 'mysql');
+
         $request->validate([
-            'branch_id' => 'required|integer|exists:branches,id',
+            'branch_id' => 'required|integer|exists:' . $targetConnection . '.branches,id',
             'count' => 'required|integer',
             'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
-
-        $targetConnection = $request->input('target_database', 'mysql');
 
         $batchSize = 20; // Reduce el tamaño del lote para evitar sobrecargar la ejecución
 
@@ -1573,7 +1580,7 @@ class MigrationController extends Controller
     /**
      * Update vouchers for the assigned plan based on new consumed amount
      */
-    private function updateVouchers($assignedPlan, $item_price)
+    private function updateVouchers($assignedPlan, $item_price, string $targetConnection = 'mysql')
     {
         // Get current consumed services count
         $consumedSessions = $assignedPlan->patient->acquired_services()
@@ -1598,12 +1605,12 @@ class MigrationController extends Controller
         $totalConsumedAmount = $totalConsumedItems * $item_price;
 
         // Delete all existing vouchers
-        Voucher::where('assigned_plan_id', $assignedPlan->id)->forceDelete();
+        Voucher::on($targetConnection)->where('assigned_plan_id', $assignedPlan->id)->forceDelete();
 
         // Create new vouchers based on consumed amount
         if ($totalConsumedAmount > 0 && $totalConsumedItems > 0) {
             for ($i = 0; $i < $totalConsumedItems; $i++) {
-                Voucher::create([
+                Voucher::on($targetConnection)->create([
                     'assigned_plan_id' => $assignedPlan->id,
                     'status' => 3, // Used status
                     'quantity' => 1,
@@ -1614,7 +1621,7 @@ class MigrationController extends Controller
         }
     }
 
-    private function updatePlanConsume($assignedPlan, $consume)
+    private function updatePlanConsume($assignedPlan, $consume, string $targetConnection = 'mysql')
     {
         $total_items = $assignedPlan->total_sessions + $assignedPlan->therapies_number;
         $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
@@ -1622,7 +1629,7 @@ class MigrationController extends Controller
 
         // Crear vouchers para que count(vouchers) * $item_price = $p->consumido
         if ($consume > 0 && $item_price > 0) {
-            Voucher::where('assigned_plan_id', $assignedPlan->id)->forceDelete();
+            Voucher::on($targetConnection)->where('assigned_plan_id', $assignedPlan->id)->forceDelete();
             // Calcular cuántos vouchers necesitamos: consumido / precio_por_item
             $vouchers_needed = round($consume / $item_price);
 
@@ -1630,7 +1637,7 @@ class MigrationController extends Controller
             $vouchers_needed = min($vouchers_needed, $total_consumed_items);
 
             for ($i = 0; $i < $vouchers_needed; $i++) {
-                Voucher::create([
+                Voucher::on($targetConnection)->create([
                     'assigned_plan_id' => $assignedPlan->id,
                     'status' => 3,
                     'quantity' => 1,
@@ -1642,7 +1649,7 @@ class MigrationController extends Controller
             $price_per_voucher = $consume / $total_consumed_items;
 
             for ($i = 0; $i < $total_consumed_items; $i++) {
-                Voucher::create([
+                Voucher::on($targetConnection)->create([
                     'assigned_plan_id' => $assignedPlan->id,
                     'status' => 3,
                     'quantity' => 1,
@@ -1652,7 +1659,7 @@ class MigrationController extends Controller
         }
     }
 
-    private function updatePlanBalance($assignedPlan, $balance)
+    private function updatePlanBalance($assignedPlan, $balance, string $targetConnection = 'mysql')
     {
 
     }
