@@ -31,9 +31,9 @@ class MigratePlanesAsignados extends BaseCommand
             whereIn('paciente_id', Patient::whereDoesntHave('assigned_plan')->whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)->pluck('id')->toArray())
             ->whereIn('plan_id', Plan::whereNotIn('id', $this->ignored_plan)->pluck('id')->toArray())
             ->chunk(500, function ($pacientes) use (&$migrate_plans_id) {
-                $user = User::first();
                 foreach ($pacientes as $p) {
                     if (in_array($p->estado, [1, 2, 3])) {
+                        $user = User::find($p->user_changer) ?? User::first();
 
                         $planStatusMatch = [
                             1 => PlanStatus::Activo->value,

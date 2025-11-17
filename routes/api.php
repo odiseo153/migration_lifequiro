@@ -15,6 +15,14 @@ Route::get('/user', function (Request $request) {
 //   - target_database (string: 'mysql' or 'produccion', default: 'mysql'): destination database to write to
 Route::post('/migrate-patients', [App\Http\Controllers\MigrationController::class, 'migratePatientsByIds']);
 
+// Update existing patients with missing data from legacy database
+// Parameters:
+//   - patient_ids (array): IDs of patients that already exist in new system
+//   - data_to_migrate (array): Data types to migrate ['citas', 'planes', 'balance', 'compras', 'antecedentes', 'historial_ajuste', 'historial_terapia']
+//   - legacy_database (string: 'legacy' or 'produccion', default: 'legacy'): source database to read from
+//   - target_database (string: 'mysql' or 'produccion', default: 'mysql'): destination database to write to
+Route::post('/update-existing-patients-data', [App\Http\Controllers\MigrationController::class, 'updateExistingPatientsData']);
+
 // Update assigned plan endpoint
 Route::put('/assigned-plans', [App\Http\Controllers\MigrationController::class, 'updateAssignedPlan']);
 Route::put('/change-type-of-patient', [App\Http\Controllers\MigrationController::class, 'changeTypeOfPatient']);

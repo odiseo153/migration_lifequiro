@@ -435,9 +435,10 @@ class MigrationController extends Controller
         // Calcular precio por ítem
         $total_items = $assignedPlan->plan->total_sessions + $assignedPlan->therapies_number;
         $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
+        $legacy_consumed = $p->consumido ;
 
         // Crear vouchers en base de datos objetivo
-        if ($p->consumido > 0) {
+        if ($legacy_consumed > 0) {
             Voucher::on($targetConnection)->create([
                 'assigned_plan_id' => $assignedPlan->id,
                 'status' => 3,
@@ -478,6 +479,25 @@ class MigrationController extends Controller
                 ]);
             }
         }
+
+
+        $migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)
+            ->sum('price');
+
+        $difference = $legacy_consumed - $migrated_consumed;
+
+        // Si hay diferencia, crear un voucher con la diferencia para que cuadre
+        if ($difference != 0) {
+            // Crear un voucher con la diferencia
+            Voucher::create([
+                'assigned_plan_id' => $assignedPlan->id,
+                'status' => 3,
+                'quantity' => 1,
+                'price' => $difference,
+                'created_at' => $this->parseDateInt($p->fecha_cre),
+            ]);
+        } 
+
     }
 
     private function migrateBalance(array $patientIds, array &$results, array $idMapping, string $legacyConnection = 'legacy', string $targetConnection = 'mysql')
@@ -1310,143 +1330,143 @@ class MigrationController extends Controller
             'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
 
-            $legacyConnection = $request->input('legacy_database', 'legacy');
-            $targetConnection = $request->input('target_database', 'mysql');
+        $legacyConnection = $request->input('legacy_database', 'legacy');
+        $targetConnection = $request->input('target_database', 'mysql');
 
-            DB::connection($targetConnection)->beginTransaction();
+        DB::connection($targetConnection)->beginTransaction();
 
-            $results = [
-                'success' => true,
-                'checked_plans' => 0,
-                'updated_plans' => 0,
-                'differences_found' => [],
-                'errors' => []
-            ];
+        $results = [
+            'success' => true,
+            'checked_plans' => 0,
+            'updated_plans' => 0,
+            'differences_found' => [],
+            'errors' => []
+        ];
 
-            // Determinar qué planes revisar desde la base de datos objetivo
-            if ($request->has('assigned_plan_ids') && !empty($request->assigned_plan_ids)) {
-                // Revisar planes específicos
-                $assignedPlans = AssignedPlan::on($targetConnection)->whereIn('id', $request->assigned_plan_ids)->get();
-            } elseif ($request->has('patient_ids') && !empty($request->patient_ids)) {
-                // Revisar planes de pacientes específicos
-                $assignedPlans = AssignedPlan::on($targetConnection)->whereIn('patient_id', $request->patient_ids)->get();
-            } elseif ($request->has('branch_ids') && !empty($request->branch_ids)) {
-                // Revisar planes de pacientes por branch_id
-                $assignedPlans = AssignedPlan::on($targetConnection)->whereHas('patient', function ($query) use ($request) {
-                    $query->whereIn('branch_id', $request->branch_ids);
-                })->get();
-            } elseif ($request->check_all) {
-                // Revisar todos los planes (con límite de seguridad)
-                $assignedPlans = AssignedPlan::on($targetConnection)->limit(1000)->get();
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Debe especificar patient_ids, assigned_plan_ids, branch_ids o check_all=true'
-                ], 400);
+        // Determinar qué planes revisar desde la base de datos objetivo
+        if ($request->has('assigned_plan_ids') && !empty($request->assigned_plan_ids)) {
+            // Revisar planes específicos
+            $assignedPlans = AssignedPlan::on($targetConnection)->whereIn('id', $request->assigned_plan_ids)->get();
+        } elseif ($request->has('patient_ids') && !empty($request->patient_ids)) {
+            // Revisar planes de pacientes específicos
+            $assignedPlans = AssignedPlan::on($targetConnection)->whereIn('patient_id', $request->patient_ids)->get();
+        } elseif ($request->has('branch_ids') && !empty($request->branch_ids)) {
+            // Revisar planes de pacientes por branch_id
+            $assignedPlans = AssignedPlan::on($targetConnection)->whereHas('patient', function ($query) use ($request) {
+                $query->whereIn('branch_id', $request->branch_ids);
+            })->get();
+        } elseif ($request->check_all) {
+            // Revisar todos los planes (con límite de seguridad)
+            $assignedPlans = AssignedPlan::on($targetConnection)->limit(1000)->get();
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debe especificar patient_ids, assigned_plan_ids, branch_ids o check_all=true'
+            ], 400);
+        }
+
+        foreach ($assignedPlans as $assignedPlan) {
+            $results['checked_plans']++;
+
+            // Buscar el plan en la base de datos legacy especificada
+            $legacyPlan = Ajuste::on($legacyConnection)->where('id', $assignedPlan->id)->first();
+
+            if (!$legacyPlan) {
+                $results['errors'][] = "Plan asignado {$assignedPlan->id} no encontrado en base de datos legacy";
+                continue;
             }
 
-            foreach ($assignedPlans as $assignedPlan) {
-                    $results['checked_plans']++;
+            $differences = [];
+            $needsUpdate = false;
 
-                    // Buscar el plan en la base de datos legacy especificada
-                    $legacyPlan = Ajuste::on($legacyConnection)->where('id', $assignedPlan->id)->first();
+            // Comparar total_sessions (viene del plan actual)
+            $currentTotalSessions = $assignedPlan->total_sessions ?? 0;
+            $legacyTotalSessions = $legacyPlan->ajustes ?? 0; // En legacy viene del plan también
 
-                    if (!$legacyPlan) {
-                        $results['errors'][] = "Plan asignado {$assignedPlan->id} no encontrado en base de datos legacy";
-                        continue;
-                    }
+            // Comparar therapies_number
+            $currentTherapiesNumber = $assignedPlan->therapies_number ?? 0;
+            $legacyTherapiesNumber = $legacyPlan->terapias_fisicas ?? 0;
 
-                    $differences = [];
-                    $needsUpdate = false;
+            if ($currentTherapiesNumber != $legacyTherapiesNumber) {
+                $differences['therapies_number'] = [
+                    'current' => $currentTherapiesNumber,
+                    'legacy' => $legacyTherapiesNumber
+                ];
+                $needsUpdate = true;
+            }
 
-                    // Comparar total_sessions (viene del plan actual)
-                    $currentTotalSessions = $assignedPlan->total_sessions ?? 0;
-                    $legacyTotalSessions = $legacyPlan->ajustes ?? 0; // En legacy viene del plan también
+            if ($currentTotalSessions != $legacyTotalSessions) {
+                $differences['total_sessions'] = [
+                    'current' => $currentTotalSessions,
+                    'legacy' => $legacyTotalSessions
+                ];
+                $needsUpdate = true;
+            }
 
-                    // Comparar therapies_number
-                    $currentTherapiesNumber = $assignedPlan->therapies_number ?? 0;
-                    $legacyTherapiesNumber = $legacyPlan->terapias_fisicas ?? 0;
+            // Comparar otros campos importantes
+            $currentAmount = $assignedPlan->amount ?? 0;
+            $legacyAmount = $legacyPlan->costo ?? 0;
 
-                    if ($currentTherapiesNumber != $legacyTherapiesNumber) {
-                        $differences['therapies_number'] = [
-                            'current' => $currentTherapiesNumber,
-                            'legacy' => $legacyTherapiesNumber
-                        ];
-                        $needsUpdate = true;
-                    }
+            if (abs($currentAmount - $legacyAmount) > 0.01) {
+                $differences['amount'] = [
+                    'current' => $currentAmount,
+                    'legacy' => $legacyAmount
+                ];
+                $needsUpdate = true;
+            }
 
-                    if ($currentTotalSessions != $legacyTotalSessions) {
-                        $differences['total_sessions'] = [
-                            'current' => $currentTotalSessions,
-                            'legacy' => $legacyTotalSessions
-                        ];
-                        $needsUpdate = true;
-                    }
+            // Comparar fechas
+            /*
+            $currentDateStart = $assignedPlan->date_start;
+            $legacyDateStart = $this->parseDate($legacyPlan->fecha_ciclo_insertada);
 
-                    // Comparar otros campos importantes
-                    $currentAmount = $assignedPlan->amount ?? 0;
-                    $legacyAmount = $legacyPlan->costo ?? 0;
+            if ($currentDateStart != $legacyDateStart) {
+                $differences['date_start'] = [
+                    'current' => $currentDateStart,
+                    'legacy' => $legacyDateStart
+                ];
+                $needsUpdate = true;
+            }
 
-                    if (abs($currentAmount - $legacyAmount) > 0.01) {
-                        $differences['amount'] = [
-                            'current' => $currentAmount,
-                            'legacy' => $legacyAmount
-                        ];
-                        $needsUpdate = true;
-                    }
+            $currentDateEnd = $assignedPlan->date_end;
+            $legacyDateEnd = $this->parseDate($legacyPlan->fecha_expiracion);
 
-                    // Comparar fechas
-                    /*
-                    $currentDateStart = $assignedPlan->date_start;
-                    $legacyDateStart = $this->parseDate($legacyPlan->fecha_ciclo_insertada);
+            if ($currentDateEnd != $legacyDateEnd) {
+                $differences['date_end'] = [
+                    'current' => $currentDateEnd,
+                    'legacy' => $legacyDateEnd
+                ];
+                $needsUpdate = true;
+            }
+            */
 
-                    if ($currentDateStart != $legacyDateStart) {
-                        $differences['date_start'] = [
-                            'current' => $currentDateStart,
-                            'legacy' => $legacyDateStart
-                        ];
-                        $needsUpdate = true;
-                    }
-
-                    $currentDateEnd = $assignedPlan->date_end;
-                    $legacyDateEnd = $this->parseDate($legacyPlan->fecha_expiracion);
-
-                    if ($currentDateEnd != $legacyDateEnd) {
-                        $differences['date_end'] = [
-                            'current' => $currentDateEnd,
-                            'legacy' => $legacyDateEnd
-                        ];
-                        $needsUpdate = true;
-                    }
-                    */
-
-                    // Si hay diferencias, actualizar el plan
-                    if ($needsUpdate) {
-                        $assignedPlan->update([
-                            'therapies_number' => $legacyTherapiesNumber,
-                            'total_sessions' => $legacyTotalSessions,
-                            'amount' => $legacyAmount,
-                            //        'date_start' => $legacyDateStart,
-                            //      'date_end' => $legacyDateEnd,
-                        ]);
+            // Si hay diferencias, actualizar el plan
+            if ($needsUpdate) {
+                $assignedPlan->update([
+                    'therapies_number' => $legacyTherapiesNumber,
+                    'total_sessions' => $legacyTotalSessions,
+                    'amount' => $legacyAmount,
+                    //        'date_start' => $legacyDateStart,
+                    //      'date_end' => $legacyDateEnd,
+                ]);
 
 
-                        $results['updated_plans']++;
-                        $results['differences_found'][] = [
-                            'assigned_plan_id' => $assignedPlan->id,
-                            'patient_id' => $assignedPlan->patient_id,
-                            'patient_name' => $assignedPlan->patient->first_name . ' ' . $assignedPlan->patient->last_name ?? 'N/A',
-                            'plan_name' => $assignedPlan->plan_name,
-                            'differences' => $differences
-                        ];
-
-                    }
+                $results['updated_plans']++;
+                $results['differences_found'][] = [
+                    'assigned_plan_id' => $assignedPlan->id,
+                    'patient_id' => $assignedPlan->patient_id,
+                    'patient_name' => $assignedPlan->patient->first_name . ' ' . $assignedPlan->patient->last_name ?? 'N/A',
+                    'plan_name' => $assignedPlan->plan_name,
+                    'differences' => $differences
+                ];
 
             }
 
-            DB::connection($targetConnection)->commit();
+        }
 
-            return response()->json($results);
+        DB::connection($targetConnection)->commit();
+
+        return response()->json($results);
 
     }
 
@@ -1510,8 +1530,8 @@ class MigrationController extends Controller
 
         $request->validate([
             'branch_id' => 'required|integer|exists:' . $targetConnection . '.branches,id',
-          //  'assigned_plan_ids' => 'required|array',
-          //  'assigned_plan_ids.*' => 'integer',
+            //  'assigned_plan_ids' => 'required|array',
+            //  'assigned_plan_ids.*' => 'integer',
             'count' => 'required|integer',
             'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
@@ -1527,46 +1547,46 @@ class MigrationController extends Controller
             AssignedPlan::on($targetConnection)->whereHas('patient', function ($query) use ($request) {
                 $query->where('branch_id', $request->branch_id);
             })
-            ->limit($request->count)
-            ->chunkById($batchSize, function ($assignedPlans) use (&$totalDeleted, $targetConnection) {
-                foreach ($assignedPlans as $assignedPlan) {
-                    try {
-                        DB::connection($targetConnection)->beginTransaction();
+                ->limit($request->count)
+                ->chunkById($batchSize, function ($assignedPlans) use (&$totalDeleted, $targetConnection) {
+                    foreach ($assignedPlans as $assignedPlan) {
+                        try {
+                            DB::connection($targetConnection)->beginTransaction();
 
-                        // Eliminar las relaciones y datos dependientes de manera adecuada
-                        $assignedPlan->installments()->forceDelete();
-                        $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
-                        $assignedPlan->services()->forceDelete();
-                        $assignedPlan->ScheduledAppointments()->forceDelete();
-                        $assignedPlan->voucher()->each(function ($voucher) {
-                            $voucher->plan_items()->detach();
-                            $voucher->patient_items()->detach();
-                        });
-                        $assignedPlan->voucher()->forceDelete();
-                        $assignedPlan->descuentAuthorizations()->forceDelete();
-                        $assignedPlan->planConsume()->forceDelete();
-                        $assignedPlan->transactions()->forceDelete();
-                        $assignedPlan->forceDelete();
+                            // Eliminar las relaciones y datos dependientes de manera adecuada
+                            $assignedPlan->installments()->forceDelete();
+                            $assignedPlan->appointments()->update(['assigned_plan_id' => null]);
+                            $assignedPlan->services()->forceDelete();
+                            $assignedPlan->ScheduledAppointments()->forceDelete();
+                            $assignedPlan->voucher()->each(function ($voucher) {
+                                $voucher->plan_items()->detach();
+                                $voucher->patient_items()->detach();
+                            });
+                            $assignedPlan->voucher()->forceDelete();
+                            $assignedPlan->descuentAuthorizations()->forceDelete();
+                            $assignedPlan->planConsume()->forceDelete();
+                            $assignedPlan->transactions()->forceDelete();
+                            $assignedPlan->forceDelete();
 
-                        $totalDeleted++;
+                            $totalDeleted++;
 
-                        DB::connection($targetConnection)->commit();
-                    } catch (\Throwable $inner) {
-                        DB::connection($targetConnection)->rollBack();
-                        Log::error('Error eliminando plan asignado (por lote): ' . $inner->getMessage(), [
-                            'assigned_plan_id' => $assignedPlan->id,
-                            'trace' => $inner->getTraceAsString()
-                        ]);
-                        // Continúa con el siguiente
-                        continue;
+                            DB::connection($targetConnection)->commit();
+                        } catch (\Throwable $inner) {
+                            DB::connection($targetConnection)->rollBack();
+                            Log::error('Error eliminando plan asignado (por lote): ' . $inner->getMessage(), [
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'trace' => $inner->getTraceAsString()
+                            ]);
+                            // Continúa con el siguiente
+                            continue;
+                        }
                     }
-                }
 
-                // Liberar memoria en cada lote
-                if (function_exists('gc_collect_cycles')) {
-                    gc_collect_cycles();
-                }
-            });
+                    // Liberar memoria en cada lote
+                    if (function_exists('gc_collect_cycles')) {
+                        gc_collect_cycles();
+                    }
+                });
 
             return response()->json([
                 'success' => true,
@@ -1721,5 +1741,252 @@ class MigrationController extends Controller
         }
 
         return $newId;
+    }
+
+    /**
+     * Migrar datos faltantes a pacientes que ya existen en el sistema nuevo
+     * Permite seleccionar qué datos específicos se quieren migrar
+     * 
+     * IMPORTANTE: Los pacientes pueden tener IDs diferentes en el sistema nuevo.
+     * Esta función usa la columna 'old_id' del modelo Patient para mapear correctamente
+     * los datos del sistema legacy con los pacientes del sistema nuevo.
+     */
+    public function updateExistingPatientsData(Request $request)
+    {
+        ini_set('memory_limit', '2G');
+        ini_set('max_execution_time', 600);
+
+        $request->validate([
+            'patient_ids' => 'required|array|min:1',
+            'patient_ids.*' => 'integer',
+            'legacy_database' => 'nullable|string|in:legacy,produccion',
+            'target_database' => 'nullable|string|in:mysql,produccion',
+            'data_to_migrate' => 'required|array|min:1',
+            'data_to_migrate.*' => 'string|in:planes,balance,compras,antecedentes,historial_ajuste,historial_terapia,citas'
+        ]);
+
+        $patientIds = $request->input('patient_ids');
+        $legacyConnection = $request->input('legacy_database', 'legacy');
+        $targetConnection = $request->input('target_database', 'mysql');
+        $dataToMigrate = $request->input('data_to_migrate');
+
+        try {
+            DB::connection($targetConnection)->beginTransaction();
+
+            $results = [
+                'success' => true,
+                'processed_patients' => 0,
+                'migrated_appointments' => 0,
+                'migrated_plans' => 0,
+                'migrated_balances' => 0,
+                'migrated_purchases' => 0,
+                'migrated_medical_records' => 0,
+                'migrated_adjustments' => 0,
+                'migrated_therapies' => 0,
+                'errors' => [],
+                'patient_mappings' => [] // Para debug: mostrar mapeo de IDs
+            ];
+
+            // Obtener pacientes con sus old_id para mapear correctamente
+            $patients = Patient::on($targetConnection)
+                ->whereIn('id', $patientIds)
+                ->get(['id', 'old_id', 'first_name', 'last_name']);
+
+            if ($patients->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ninguno de los pacientes especificados existe en el sistema nuevo',
+                    'errors' => ['Pacientes no encontrados: ' . implode(', ', $patientIds)]
+                ], 404);
+            }
+
+            // Crear mapeo de old_id -> new_id
+            // Si old_id es null, asumimos que el ID no cambió
+            $idMapping = [];
+            $legacyPatientIds = [];
+            $patientsWithoutOldId = [];
+
+            foreach ($patients as $patient) {
+                $oldId = $patient->old_id ?? $patient->id;
+                $newId = $patient->id;
+                
+                // Mapeo: old_id (del sistema legacy) -> new_id (del sistema nuevo)
+                $idMapping[$oldId] = $newId;
+                $legacyPatientIds[] = $oldId;
+
+                // Para debug y transparencia
+                $results['patient_mappings'][] = [
+                    'new_id' => $newId,
+                    'old_id' => $oldId,
+                    'name' => trim($patient->first_name . ' ' . $patient->last_name),
+                    'id_changed' => ($oldId != $newId)
+                ];
+
+                if ($patient->old_id === null) {
+                    $patientsWithoutOldId[] = $newId;
+                }
+            }
+
+            // Advertencia si hay pacientes sin old_id
+            if (!empty($patientsWithoutOldId)) {
+                $results['errors'][] = "Advertencia: Pacientes sin old_id (se asume ID sin cambios): " . implode(', ', $patientsWithoutOldId);
+            }
+
+            $results['processed_patients'] = count($patients);
+
+            // Ahora usamos $legacyPatientIds para buscar en el sistema legacy
+            // y $idMapping para mapear old_id -> new_id
+
+            if (in_array('citas', $dataToMigrate)) {
+                $this->migrateAppointmentsOnly($legacyPatientIds, $results, $idMapping, $legacyConnection, $targetConnection);
+            }
+
+            if (in_array('planes', $dataToMigrate)) {
+                $this->migratePlanes($legacyPatientIds, $results, $idMapping, $legacyConnection, $targetConnection);
+            }
+
+            if (in_array('balance', $dataToMigrate)) {
+                $this->migrateBalance($legacyPatientIds, $results, $idMapping, $legacyConnection, $targetConnection);
+            }
+
+            if (in_array('compras', $dataToMigrate)) {
+                $this->migrateCompras($legacyPatientIds, $results, $idMapping, $legacyConnection, $targetConnection);
+            }
+
+            if (in_array('antecedentes', $dataToMigrate)) {
+                $this->migrateAntecedentes($legacyPatientIds, $results, $idMapping, $legacyConnection, $targetConnection);
+            }
+
+            if (in_array('historial_ajuste', $dataToMigrate)) {
+                $this->migrateHistorialAjuste($legacyPatientIds, $results, $idMapping, $legacyConnection, $targetConnection);
+            }
+
+            if (in_array('historial_terapia', $dataToMigrate)) {
+                $this->migrateHistorialTerapiaFisicas($legacyPatientIds, $results, $idMapping, $legacyConnection, $targetConnection);
+            }
+
+            DB::connection($targetConnection)->commit();
+
+            return response()->json($results);
+
+        } catch (\Exception $e) {
+            DB::connection($targetConnection)->rollBack();
+            Log::error('Error actualizando datos de pacientes existentes: ' . $e->getMessage(), [
+                'patient_ids' => $patientIds,
+                'data_to_migrate' => $dataToMigrate,
+                'legacy_database' => $legacyConnection,
+                'target_database' => $targetConnection,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error durante la actualización: ' . $e->getMessage(),
+                'errors' => [$e->getMessage()]
+            ], 500);
+        }
+    }
+
+    /**
+     * Migrar solo las citas (sin migrar el paciente)
+     */
+    private function migrateAppointmentsOnly(array $patientIds, array &$results, array $idMapping, string $legacyConnection = 'legacy', string $targetConnection = 'mysql')
+    {
+        // Mapeo de tipos de cita
+        $CitaTipoOld = [
+            1 => AppointmentType::CONSULTA->value,
+            2 => AppointmentType::RADIOGRAFIA->value,
+            3 => AppointmentType::REPORTE->value,
+            4 => AppointmentType::MIP->value,
+            5 => AppointmentType::MR->value,
+            6 => AppointmentType::COMPARACION->value,
+            7 => AppointmentType::MR->value,
+            8 => AppointmentType::MIP->value,
+        ];
+
+        // Obtener últimas citas de los pacientes
+        $lastAppointments = DB::connection($legacyConnection)->table('cita as c1')
+            ->select('c1.paciente_id', 'c1.tipo', 'c1.estado_id', 'c1.hora', 'c1.dia', 'c1.fecha')
+            ->leftJoin('cita as c2', function ($join) {
+                $join->on('c1.paciente_id', '=', 'c2.paciente_id')
+                    ->on('c1.id', '<', 'c2.id')
+                    ->where('c2.estado_id', AppointmentStatus::COMPLETADA->value);
+            })
+            ->where('c1.estado_id', AppointmentStatus::COMPLETADA->value)
+            ->whereIn('c1.paciente_id', $patientIds)
+            ->whereNull('c2.id')
+            ->get()
+            ->keyBy('paciente_id');
+
+        // Obtener pacientes legacy para obtener branch_id
+        $legacyPatients = Paciente::on($legacyConnection)
+            ->whereIn('id', $patientIds)
+            ->get()
+            ->keyBy('id');
+
+        $appointmentsToInsert = [];
+
+        foreach ($lastAppointments as $oldPatientId => $lastAppointment) {
+            try {
+                if (!isset($idMapping[$oldPatientId])) {
+                    continue;
+                }
+
+                $finalPatientId = $idMapping[$oldPatientId];
+                $legacyPatient = $legacyPatients[$oldPatientId] ?? null;
+
+                if (!$legacyPatient) {
+                    continue;
+                }
+
+                $branch_id = $legacyPatient->centro_id == 0 || $legacyPatient->centro_id == null ? 1 : $legacyPatient->centro_id;
+
+                try {
+                    $hourFormatted = \Carbon\Carbon::createFromFormat('g:ia', $lastAppointment->hora)->format('H:i:s');
+                } catch (\Exception $e) {
+                    $hourFormatted = '09:00:00';
+                }
+
+                $TypeAppointment = $lastAppointment->tipo > 8 ?
+                    AppointmentType::MIP->value :
+                    ($CitaTipoOld[$lastAppointment->tipo] ?? AppointmentType::MIP->value);
+
+                $appointmentData = [
+                    'note' => 'Cita de migración actualizada',
+                    'patient_id' => $finalPatientId,
+                    'branch_id' => $branch_id,
+                    'type_of_appointment_id' => $TypeAppointment,
+                    'status_id' => $lastAppointment->estado_id,
+                    'date' => $this->parseDateInt($lastAppointment->dia),
+                    'hour' => $hourFormatted,
+                    'created_at' => $lastAppointment->fecha,
+                    'updated_at' => now(),
+                ];
+
+                $appointmentsToInsert[] = $appointmentData;
+
+            } catch (\Exception $e) {
+                $results['errors'][] = "Error preparando cita para paciente {$oldPatientId}: " . $e->getMessage();
+            }
+        }
+
+        // Insertar citas
+        if (!empty($appointmentsToInsert)) {
+            $appointmentPatientIds = collect($appointmentsToInsert)->pluck('patient_id')->unique()->toArray();
+            $existingPatientIds = Patient::on($targetConnection)->whereIn('id', $appointmentPatientIds)->pluck('id')->toArray();
+
+            $validAppointments = collect($appointmentsToInsert)->filter(function ($appointment) use ($existingPatientIds) {
+                return in_array($appointment['patient_id'], $existingPatientIds);
+            })->toArray();
+
+            if (!empty($validAppointments)) {
+                $insertBatchSize = 50;
+                $appointmentChunks = array_chunk($validAppointments, $insertBatchSize);
+                foreach ($appointmentChunks as $chunk) {
+                    Appointment::on($targetConnection)->insert($chunk);
+                }
+                $results['migrated_appointments'] += count($validAppointments);
+            }
+        }
     }
 }
