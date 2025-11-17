@@ -1510,8 +1510,8 @@ class MigrationController extends Controller
 
         $request->validate([
             'branch_id' => 'required|integer|exists:' . $targetConnection . '.branches,id',
-            'assigned_plan_ids' => 'required|array',
-            'assigned_plan_ids.*' => 'integer',
+          //  'assigned_plan_ids' => 'required|array',
+          //  'assigned_plan_ids.*' => 'integer',
             'count' => 'required|integer',
             'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
