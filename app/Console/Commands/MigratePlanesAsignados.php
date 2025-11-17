@@ -99,20 +99,6 @@ $migrate_plans_id=[];
                             ]);
                         }
 
-                        $consumido = (int) ($p->consumido ?? 0);
-
-                        // Crear UN SOLO voucher con el consumido exacto
-                        if ($consumido != 0) {
-                            $voucher = Voucher::create([
-                                'assigned_plan_id' => $assignedPlan->id,
-                                'status' => 3,
-                                'quantity' => 1,
-                                'price' => $consumido,
-                                'created_at' => $this->parseDateInt($p->fecha_cre),
-                            ]);
-                        }
-
-
                         // Calcular precio por item para servicios adquiridos
                         $total_items = ($p->ajustes ?? 0) + ($p->terapias_fisicas ?? 0);
                         $item_price = $total_items != 0 ? $p->costo / $total_items : 0;
@@ -145,8 +131,9 @@ $migrate_plans_id=[];
 
                             $terapias = (int) $p->terapias_utilizadas;
                             for ($i = 0; $i < $terapias; $i++) {
-                                if ($used_therapies >= $p->terapias_utilizadas)
+                                if ($used_therapies >= $p->terapias_utilizadas){
                                     break;
+                                }
                                 AcquiredService::create([
                                     'patient_id' => $p->paciente_id,
                                     'assigned_plan_id' => $assignedPlan->id,
@@ -157,36 +144,48 @@ $migrate_plans_id=[];
                             }
                         }
 
-                        $migrated_consumed = (int) $voucher->price;
-                        $legacy_consumed = (int) $consumido;
-                        $difference = $migrated_consumed - $legacy_consumed;
+                        // Calcular el consumido migrado basado en los servicios adquiridos
+                        $migrated_consumed = (int) AcquiredService::where('assigned_plan_id', $assignedPlan->id)
+                            ->where('status', ServicesStatus::COMPLETADA->value)
+                            ->sum('price');
 
+                        $legacy_consumed = (int) ($p->consumido ?? 0);
+                        $difference = $legacy_consumed - $migrated_consumed;
+
+                        // Si hay diferencia, crear un voucher con la diferencia para que cuadre
                         if ($difference != 0) {
                             $this->warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                             $this->warn("AJUSTANDO: Plan ID {$assignedPlan->id} - Consumido no coincide!");
                             $this->warn("  Legacy consumido: {$legacy_consumed}");
-                            $this->warn("  Migrado consumido: {$migrated_consumed}");
+                            $this->warn("  Migrado consumido (servicios): {$migrated_consumed}");
                             $this->warn("  Diferencia: {$difference}");
 
-                            // Eliminar el voucher existente y crear uno con el precio correcto
-                                Voucher::create([
-                                    'assigned_plan_id' => $assignedPlan->id,
-                                    'status' => 3,
-                                    'quantity' => 1,
-                                    'price' => $difference,
-                                    'created_at' => $this->parseDateInt($p->fecha_cre),
-                                ]);
+                            // Crear un voucher con la diferencia
+                            Voucher::create([
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'status' => 3,
+                                'quantity' => 1,
+                                'price' => $difference,
+                                'created_at' => $this->parseDateInt($p->fecha_cre),
+                            ]);
 
                             // Verificar el ajuste
-                            $new_migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+                            $voucher_total = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+                            $new_migrated_consumed = $migrated_consumed + $voucher_total;
 
                             if ($new_migrated_consumed == $legacy_consumed) {
-                                $this->info("  ✓ Ajuste exitoso: Voucher con precio = {$new_migrated_consumed}");
+                                $this->info("  ✓ Ajuste exitoso: Total consumido = {$new_migrated_consumed} (Servicios: {$migrated_consumed} + Voucher: {$voucher_total})");
                             } else {
-                                $this->error("  ✗ Ajuste fallido: Diferencia restante = " . ($new_migrated_consumed - $legacy_consumed));
+                                $this->error("  ✗ Ajuste fallido: Total = {$new_migrated_consumed}, Esperado = {$legacy_consumed}, Diferencia restante = " . ($new_migrated_consumed - $legacy_consumed));
                             }
 
                             $this->warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                        } elseif ($legacy_consumed == 0) {
+                            // No hay consumido en legacy ni en migración
+                            $this->info("Plan ID {$assignedPlan->id}: Sin consumo registrado");
+                        } else {
+                            // Consumido coincide exactamente
+                            $this->info("Plan ID {$assignedPlan->id}: Consumido coincide ({$legacy_consumed})");
                         }
 
                     }
