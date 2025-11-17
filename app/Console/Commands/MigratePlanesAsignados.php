@@ -25,7 +25,7 @@ class MigratePlanesAsignados extends BaseCommand
     public function handle()
     {
         $this->info("Iniciando migración de planes asignados...");
-$migrate_plans_id=[];
+        $migrate_plans_id = [];
 
         Ajuste::
             whereIn('paciente_id', Patient::whereDoesntHave('assigned_plan')->whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)->pluck('id')->toArray())
@@ -131,7 +131,7 @@ $migrate_plans_id=[];
 
                             $terapias = (int) $p->terapias_utilizadas;
                             for ($i = 0; $i < $terapias; $i++) {
-                                if ($used_therapies >= $p->terapias_utilizadas){
+                                if ($used_therapies >= $p->terapias_utilizadas) {
                                     break;
                                 }
                                 AcquiredService::create([
@@ -144,12 +144,23 @@ $migrate_plans_id=[];
                             }
                         }
 
+                        $legacy_consumed = (int) ($p->consumido ?? 0);
+
+                        if ($legacy_consumed != 0) {
+                            Voucher::create([
+                                'assigned_plan_id' => $assignedPlan->id,
+                                'status' => 3,
+                                'quantity' => 1,
+                                'price' => $legacy_consumed,
+                                'created_at' => $this->parseDateInt($p->fecha_cre),
+                            ]);
+                        }
+
+
                         // Calcular el consumido migrado basado en los servicios adquiridos
-                        $migrated_consumed = (int) AcquiredService::where('assigned_plan_id', $assignedPlan->id)
-                            ->where('status', ServicesStatus::COMPLETADA->value)
+                        $migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)
                             ->sum('price');
 
-                        $legacy_consumed = (int) ($p->consumido ?? 0);
                         $difference = $legacy_consumed - $migrated_consumed;
 
                         // Si hay diferencia, crear un voucher con la diferencia para que cuadre
@@ -204,34 +215,34 @@ $migrate_plans_id=[];
         $invalid_details = [];
 
         AssignedPlan::
-        whereIn('id', $migrate_plans_id)->
-        chunk(100, function ($assignedPlans) use (&$total_plans, &$valid_plans, &$invalid_plans, &$invalid_details) {
-            foreach ($assignedPlans as $assignedPlan) {
-                $total_plans++;
+            whereIn('id', $migrate_plans_id)->
+            chunk(100, function ($assignedPlans) use (&$total_plans, &$valid_plans, &$invalid_plans, &$invalid_details) {
+                foreach ($assignedPlans as $assignedPlan) {
+                    $total_plans++;
 
-                // Buscar el plan legacy correspondiente
-                $legacyPlan = Ajuste::where('id', $assignedPlan->id)->first();
+                    // Buscar el plan legacy correspondiente
+                    $legacyPlan = Ajuste::where('id', $assignedPlan->id)->first();
 
-                if ($legacyPlan) {
-                    // Validar consumido (números enteros)
-                    $migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
-                    $legacy_consumed = (int) $legacyPlan->consumido;
-                    $difference = $migrated_consumed - $legacy_consumed;
+                    if ($legacyPlan) {
+                        // Validar consumido (números enteros)
+                        $migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
+                        $legacy_consumed = (int) $legacyPlan->consumido;
+                        $difference = $migrated_consumed - $legacy_consumed;
 
-                    if ($difference == 0) {
-                        $valid_plans++;
-                    } else {
-                        $invalid_plans++;
-                        $invalid_details[] = [
-                            'id' => $assignedPlan->id,
-                            'legacy' => $legacy_consumed,
-                            'migrated' => $migrated_consumed,
-                            'difference' => $difference
-                        ];
+                        if ($difference == 0) {
+                            $valid_plans++;
+                        } else {
+                            $invalid_plans++;
+                            $invalid_details[] = [
+                                'id' => $assignedPlan->id,
+                                'legacy' => $legacy_consumed,
+                                'migrated' => $migrated_consumed,
+                                'difference' => $difference
+                            ];
+                        }
                     }
                 }
-            }
-        });
+            });
 
         $this->info("\n" . str_repeat("=", 60));
         $this->info("RESUMEN DE VALIDACIÓN");
