@@ -72,6 +72,8 @@ $migrate_plans_id=[];
                         );
                         //balance=pagado-consumido
 
+                        $migrate_plans_id[] = $p->id;
+
                         $assignedPlan->transactions()->create([
                             'assigned_plan_id' => $assignedPlan->id,
                             'patient_id' => $p->paciente_id,
@@ -194,7 +196,6 @@ $migrate_plans_id=[];
                         }
 
                     }
-                    $migrate_plans_id[] = $assignedPlan->id;
 
                 }
             });
