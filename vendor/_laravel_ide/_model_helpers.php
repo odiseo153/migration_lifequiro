@@ -24766,6 +24766,7 @@ namespace App\Models {
     /**
      * App\Models\PreAuthorization
      *
+     * @property mixed $branch_id
      * @property bool $is_pending
      * @property mixed $item_document_count
      * @property \Illuminate\Support\Carbon|null $deleted_at
@@ -24795,6 +24796,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization whereDeletedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization whereItemDocumentCount($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization whereIsPending($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization whereBranchId($value)
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization name()
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization dateRange()
      * @method static \Illuminate\Database\Eloquent\Builder<PreAuthorization>|PreAuthorization newModelQuery()

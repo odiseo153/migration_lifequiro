@@ -25,11 +25,12 @@ class MigratePlanesAsignados extends BaseCommand
     public function handle()
     {
         $this->info("Iniciando migración de planes asignados...");
+$migrate_plans_id=[];
 
         Ajuste::
             whereIn('paciente_id', Patient::whereDoesntHave('assigned_plan')->whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)->pluck('id')->toArray())
             ->whereIn('plan_id', Plan::whereNotIn('id', $this->ignored_plan)->pluck('id')->toArray())
-            ->chunk(500, function ($pacientes) {
+            ->chunk(500, function ($pacientes) use (&$migrate_plans_id) {
                 $user = User::first();
                 foreach ($pacientes as $p) {
                     if (in_array($p->estado, [1, 2, 3])) {
@@ -57,7 +58,7 @@ class MigratePlanesAsignados extends BaseCommand
                                 'paid_type' => 1,
                                 'amount' => $p->costo,
                                 'therapies_number' => $p->terapias_fisicas,
-                                'total_sessions' => $p->ajustes,
+                                'total_sessions' => (int) $p->ajustes,
                                 'number_installments' => Plan::find($p->plan_id)->number_installments ?? 0,
                                 'status' => $planStatusMatch[$p->estado],
                                 'branch_id' => $p->centro_id,
@@ -96,20 +97,22 @@ class MigratePlanesAsignados extends BaseCommand
                             ]);
                         }
 
+                        $consumido = (int) $p->consumido;
+
                         // Crear UN SOLO voucher con el consumido exacto
-                        if ($p->consumido > 0) {
+                        if ($consumido > 0) {
                             Voucher::create([
                                 'assigned_plan_id' => $assignedPlan->id,
                                 'status' => 3,
                                 'quantity' => 1,
-                                'price' => $p->consumido,
+                                'price' => $consumido,
                                 'created_at' => $this->parseDateInt($p->fecha_cre),
                             ]);
                         }
 
                         // VALIDACIÓN: Verificar que el consumido sea exactamente igual al legacy (números enteros)
                         $migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
-                        $legacy_consumed = (int) $p->consumido;
+                        $legacy_consumed = (int) $consumido;
                         $difference = $migrated_consumed - $legacy_consumed;
 
                         if ($difference != 0) {
@@ -153,23 +156,8 @@ class MigratePlanesAsignados extends BaseCommand
                         $priceAjuste = $item_price;
                         $priceTerapia = $item_price;
 
-                        $used_sessions = $assignedPlan->patient->acquired_services()
-                            ->whereNotNull('plan_item_id')
-                            ->whereNotNull('assigned_plan_id')
-                            ->whereHas('patient_plan_item', function ($query) {
-                                $query->where('type_of_item_id', ItemType::AJUSTE->value);
-                            })
-                            ->where('assigned_plan_id', $assignedPlan->id)
-                            ->count();
-
-                        $used_therapies = $assignedPlan->patient->acquired_services()
-                            ->whereNotNull('plan_item_id')
-                            ->whereNotNull('assigned_plan_id')
-                            ->whereHas('patient_plan_item', function ($query) {
-                                $query->where('type_of_item_id', ItemType::TERAPIA_FISICA->value);
-                            })
-                            ->where('assigned_plan_id', $assignedPlan->id)
-                            ->count();
+                        $used_sessions = $assignedPlan->sessions?->count() ?? 0;
+                        $used_therapies = $assignedPlan->therapies?->count() ?? 0;
 
                         if ($p->sesiones_utilizadas != 0) {
                             $itemAjuste = Item::where('plan', true)->where('type_of_item_id', ItemType::AJUSTE->value)->first();
@@ -205,8 +193,8 @@ class MigratePlanesAsignados extends BaseCommand
                             }
                         }
 
-
                     }
+                    $migrate_plans_id[] = $assignedPlan->id;
 
                 }
             });
@@ -221,7 +209,9 @@ class MigratePlanesAsignados extends BaseCommand
         $invalid_plans = 0;
         $invalid_details = [];
 
-        AssignedPlan::chunk(100, function ($assignedPlans) use (&$total_plans, &$valid_plans, &$invalid_plans, &$invalid_details) {
+        AssignedPlan::
+        whereIn('id', $migrate_plans_id)->
+        chunk(100, function ($assignedPlans) use (&$total_plans, &$valid_plans, &$invalid_plans, &$invalid_details) {
             foreach ($assignedPlans as $assignedPlan) {
                 $total_plans++;
 
