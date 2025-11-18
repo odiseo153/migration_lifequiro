@@ -173,8 +173,9 @@ class MigrationController extends Controller
         // Obtener todos los pacientes legacy solicitados de la conexión especificada
         $pacientes = Paciente::on($legacyConnection)->whereIn('id', $patientIds)->get();
 
-        // OPTIMIZACIÓN: Pre-cargar pacientes existentes para evitar consultas N+1 desde base de datos objetivo
-        $existingPatientIds = Patient::on($targetConnection)->whereIn('id', $patientIds)->pluck('id')->toArray();
+        // OPTIMIZACIÓN: Pre-cargar TODOS los pacientes existentes para evitar sobrescribir IDs
+        // CRÍTICO: Debemos obtener TODOS los IDs existentes, no solo los de $patientIds
+        $existingPatientIds = Patient::on($targetConnection)->pluck('id')->toArray();
         $existingPatientsByName = Patient::on($targetConnection)->select('id', 'first_name', 'last_name')
             ->get()
             ->mapWithKeys(function ($patient) {
@@ -189,14 +190,10 @@ class MigrationController extends Controller
         $patientsToInsert = [];
         $appointmentsToInsert = [];
 
-        Log::info("Procesando " . count($pacientes) . " pacientes en este lote");
 
         foreach ($pacientes as $index => $p) {
             try {
-                // Log progreso cada 10 pacientes
-                if ($index % 10 == 0) {
-                    Log::info("Procesando paciente " . ($index + 1) . " de " . count($pacientes));
-                }
+
 
                 $branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
 
@@ -207,6 +204,16 @@ class MigrationController extends Controller
                 if ($finalPatientId === null) {
                     $results['errors'][] = "Paciente {$p->id} ({$p->nombre} {$p->apellido}) ya existe en la base de datos con el mismo nombre";
                     continue;
+                }
+
+                // Log para debug: Mostrar mapeo de IDs
+                if ($finalPatientId != $p->id) {
+                    Log::info("ID de paciente cambiado durante migración", [
+                        'original_id' => $p->id,
+                        'new_id' => $finalPatientId,
+                        'patient_name' => "{$p->nombre} {$p->apellido}",
+                        'reason' => 'ID original ya existe en la base de datos'
+                    ]);
                 }
 
                 // OPTIMIZACIÓN: Usar mapeo pre-procesado en lugar de similar_text
@@ -288,7 +295,15 @@ class MigrationController extends Controller
             $insertBatchSize = 50; // Lotes más pequeños para inserción
             $patientChunks = array_chunk($patientsToInsert, $insertBatchSize);
 
-            foreach ($patientChunks as $chunk) {
+            foreach ($patientChunks as $chunkIndex => $chunk) {
+                // Verificación de seguridad: Log de los IDs que se van a insertar/actualizar
+                $idsInChunk = array_column($chunk, 'id');
+                Log::info("Insertando/actualizando lote de pacientes", [
+                    'chunk_number' => $chunkIndex + 1,
+                    'patient_ids' => $idsInChunk,
+                    'count' => count($chunk)
+                ]);
+
                 Patient::on($targetConnection)->upsert($chunk, ['id'], [
                     'email',
                     'identity_document',
@@ -306,7 +321,8 @@ class MigrationController extends Controller
                     'branch_id',
                     'patient_group_id',
                     'where_met_us_id',
-                    'updated_at'
+                    'updated_at',
+                    'old_id'
                 ]);
             }
             $results['migrated_patients'] += count($patientsToInsert);
@@ -364,6 +380,14 @@ class MigrationController extends Controller
 
                 // Usar el ID mapeado (ya sea el nuevo o el original si no cambió)
                 $finalPatientId = $idMapping[$p->paciente_id];
+
+                // Log para debug: Verificar mapeo de IDs en planes
+                Log::info("Migrando plan - Mapeo de ID de paciente", [
+                    'plan_id' => $p->id,
+                    'original_patient_id' => $p->paciente_id,
+                    'final_patient_id' => $finalPatientId,
+                    'id_changed' => ($p->paciente_id != $finalPatientId)
+                ]);
 
                 // Verificar que el paciente exista en la nueva base de datos objetivo
                 if (!Patient::on($targetConnection)->find($finalPatientId)) {
@@ -496,7 +520,7 @@ class MigrationController extends Controller
                 'price' => $difference,
                 'created_at' => $this->parseDateInt($p->fecha_cre),
             ]);
-        } 
+        }
 
     }
 
@@ -1021,7 +1045,7 @@ class MigrationController extends Controller
      */
     private function determineFinalPatientIdOptimized($legacyPatient, &$existingPatientIds, $existingPatientsByName)
     {
-        $originalId = $legacyPatient->id;
+        $originalId = (int) $legacyPatient->id;
         $legacyFullName = strtolower(trim(($legacyPatient->nombre ?? '') . ' ' . ($legacyPatient->apellido ?? '')));
 
         // Verificar si ya existe un paciente con el mismo nombre completo
@@ -1037,13 +1061,27 @@ class MigrationController extends Controller
         }
 
         // El ID existe, generar nuevo ID con prefijo incremental
+        // MEJORA: Convertir explícitamente a integer para evitar problemas de tipos
+        // Concatenamos como string para crear un ID único, luego convertimos a int
         $idExtra = 1; // Empezar desde 1, no 0
-        $newId = $idExtra . $originalId;
+        $newId = (int) ($idExtra . $originalId);
 
         // Verificar que el nuevo ID no exista y actualizar dentro del bucle
-        while (in_array($newId, $existingPatientIds)) {
+        // Agregamos límite de seguridad para evitar loops infinitos
+        $maxAttempts = 100;
+        $attempts = 0;
+
+        while (in_array($newId, $existingPatientIds) && $attempts < $maxAttempts) {
             $idExtra++;
-            $newId = $idExtra . $originalId;
+            $newId = (int) ($idExtra . $originalId);
+            $attempts++;
+        }
+
+        if ($attempts >= $maxAttempts) {
+            // Si llegamos al límite, generar un ID aleatorio muy alto
+            do {
+                $newId = rand(900000000, 999999999);
+            } while (in_array($newId, $existingPatientIds));
         }
 
         // Agregar el nuevo ID al array para futuras verificaciones
@@ -1746,7 +1784,7 @@ class MigrationController extends Controller
     /**
      * Migrar datos faltantes a pacientes que ya existen en el sistema nuevo
      * Permite seleccionar qué datos específicos se quieren migrar
-     * 
+     *
      * IMPORTANTE: Los pacientes pueden tener IDs diferentes en el sistema nuevo.
      * Esta función usa la columna 'old_id' del modelo Patient para mapear correctamente
      * los datos del sistema legacy con los pacientes del sistema nuevo.
@@ -1809,7 +1847,7 @@ class MigrationController extends Controller
             foreach ($patients as $patient) {
                 $oldId = $patient->old_id ?? $patient->id;
                 $newId = $patient->id;
-                
+
                 // Mapeo: old_id (del sistema legacy) -> new_id (del sistema nuevo)
                 $idMapping[$oldId] = $newId;
                 $legacyPatientIds[] = $oldId;
