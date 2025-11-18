@@ -1527,8 +1527,7 @@ class MigrationController extends Controller
         $lastAppointment = Appointment::on($targetConnection)
             ->where('patient_id', $patient->id)
             ->where('status_id', AppointmentStatus::COMPLETADA->value)
-            ->orderByDesc('date')
-            ->orderByDesc('hour')
+            ->orderByDesc('created_at')
             ->first();
 
         if ($lastAppointment) {
