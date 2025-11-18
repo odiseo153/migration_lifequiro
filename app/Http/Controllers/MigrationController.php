@@ -1523,20 +1523,22 @@ class MigrationController extends Controller
 
         $TypeAppointment = $request->type != 1 ? $request->type - 1 : AppointmentType::CONSULTA->value;
 
+        /*
         // Buscar la última cita completada del paciente de ese tipo en la base de datos target
         $lastAppointment = Appointment::on($targetConnection)
-            ->where('patient_id', $patient->id)
+        ->where('patient_id', $patient->id)
             ->where('status_id', AppointmentStatus::COMPLETADA->value)
             ->orderByDesc('created_at')
             ->first();
 
-        if ($lastAppointment) {
+            if ($lastAppointment) {
             return response()->json([
                 'success' => false,
                 'message' => 'La ultima cita del paciente es de este tipo'
             ], 400);
         }
 
+        */
         Appointment::on($targetConnection)->create([
             'note' => 'Cita de migración agregada manualmente',
             'patient_id' => $patient->id,
