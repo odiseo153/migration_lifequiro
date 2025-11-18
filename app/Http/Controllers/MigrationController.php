@@ -1526,7 +1526,6 @@ class MigrationController extends Controller
         // Buscar la última cita completada del paciente de ese tipo en la base de datos target
         $lastAppointment = Appointment::on($targetConnection)
             ->where('patient_id', $patient->id)
-            ->where('type_of_appointment_id', $TypeAppointment)
             ->where('status_id', AppointmentStatus::COMPLETADA->value)
             ->orderByDesc('date')
             ->orderByDesc('hour')
