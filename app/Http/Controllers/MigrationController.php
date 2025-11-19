@@ -1045,7 +1045,14 @@ class MigrationController extends Controller
      */
     private function determineFinalPatientIdOptimized($legacyPatient, &$existingPatientIds, $existingPatientsByName)
     {
-        $originalId = (int) $legacyPatient->id;
+        // Garantizar que el ID sea siempre un número
+        $originalId = is_numeric($legacyPatient->id) ? (int) $legacyPatient->id : 0;
+
+        // Rechazar si $originalId no es válido numéricamente
+        if ($originalId <= 0) {
+            return null;
+        }
+
         $legacyFullName = strtolower(trim(($legacyPatient->nombre ?? '') . ' ' . ($legacyPatient->apellido ?? '')));
 
         // Verificar si ya existe un paciente con el mismo nombre completo
@@ -1054,37 +1061,33 @@ class MigrationController extends Controller
         }
 
         // Verificar si el ID original existe
-        if (!in_array($originalId, $existingPatientIds)) {
+        if (!in_array($originalId, $existingPatientIds, true)) {
             // Agregar el ID al array para futuras verificaciones
             $existingPatientIds[] = $originalId;
             return $originalId; // El ID no existe, usar el original
         }
 
-        // El ID existe, generar nuevo ID con prefijo incremental
-        // MEJORA: Convertir explícitamente a integer para evitar problemas de tipos
-        // Concatenamos como string para crear un ID único, luego convertimos a int
-        $idExtra = 1; // Empezar desde 1, no 0
-        $newId = (int) ($idExtra . $originalId);
-
-        // Verificar que el nuevo ID no exista y actualizar dentro del bucle
-        // Agregamos límite de seguridad para evitar loops infinitos
+        // El ID existe, generar nuevo ID con incremento numérico, nunca como string
+        $idExtra = 1; // Empezar desde 1
         $maxAttempts = 100;
         $attempts = 0;
+        $newId = (int) ($originalId + $idExtra + random_int(9999, 1000)); // Sumar múltiplos grandes para evitar colisiones triviales
 
-        while (in_array($newId, $existingPatientIds) && $attempts < $maxAttempts) {
+        // Buscar un nuevo ID numérico disponible
+        while ((in_array($newId, $existingPatientIds, true) || $newId <= 0) && $attempts < $maxAttempts) {
             $idExtra++;
-            $newId = (int) ($idExtra . $originalId);
+            $newId = (int) ($originalId + $idExtra + random_int(9999, 1000)); // Sumar múltiplos de 10M para asegurar ID largo y numérico
             $attempts++;
         }
 
         if ($attempts >= $maxAttempts) {
-            // Si llegamos al límite, generar un ID aleatorio muy alto
+            // Si llegamos al límite, generar un ID aleatorio numérico muy alto
             do {
                 $newId = rand(900000000, 999999999);
-            } while (in_array($newId, $existingPatientIds));
+            } while (in_array($newId, $existingPatientIds, true) || $newId <= 0);
         }
 
-        // Agregar el nuevo ID al array para futuras verificaciones
+        // Agregar el nuevo ID numérico al array para futuras verificaciones
         $existingPatientIds[] = $newId;
 
         return $newId;
