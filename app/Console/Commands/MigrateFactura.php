@@ -37,7 +37,6 @@ class MigrateFactura extends BaseCommand
             foreach ($facturas as $f) {
 
                 if (!Patient::find($f->paciente_id)) {
-                    $this->warn("Paciente no encontrado - ID: {$f->paciente_id}. Omitiendo registro.");
                     continue;
                 }
 

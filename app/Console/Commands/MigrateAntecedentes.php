@@ -37,7 +37,6 @@ class MigrateAntecedentes extends BaseCommand
             foreach ($antecedentes as $antecedente) {
                 $patient = Patient::whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)->find($antecedente->paciente_id);
                 if (!$patient) {
-                    $this->warn("Paciente no encontrado - ID: {$antecedente->paciente_id}. Omitiendo registro.");
                     continue;
                 }
 

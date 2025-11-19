@@ -135,7 +135,6 @@ class MigrateMIPPatients extends BaseCommand
                         if (!$patient) {
                             $patient = $this->createPatientIfDoesntExist($ajuste->paciente_id);
                             if (!$patient) {
-                                $this->warn("Paciente no encontrado - ID: {$ajuste->paciente_id}. Omitiendo registro.");
                                 continue;
                             }
                         }

@@ -54,7 +54,6 @@ class MigrateHistorialLlamadas extends BaseCommand
                     $patient = Patient::find($llamada->paciente_id);
 
                     if (!$patient) {
-                        $this->warn("Paciente no encontrado - ID: {$llamada->paciente_id}. Omitiendo registro.");
                         continue;
                     }
 

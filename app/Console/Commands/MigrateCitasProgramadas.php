@@ -48,7 +48,6 @@ class MigrateCitasProgramadas extends BaseCommand
                     if (
                         $patient == null
                     ) {
-                        $this->warn("paciente no encontrado - ID: {$p->paciente_id}. Omitiendo registro.");
                         continue;
                     }
 
