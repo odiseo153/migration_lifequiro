@@ -228,10 +228,7 @@ class MigratePlanesAsignados extends BaseCommand
                             }
 
                             $this->warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                        } elseif ($legacy_consumed == 0) {
-                            // No hay consumido en legacy ni en migración
-                            $this->info("Plan ID {$assignedPlan->id}: Sin consumo registrado");
-                        }
+                        } 
 
                     }
 
