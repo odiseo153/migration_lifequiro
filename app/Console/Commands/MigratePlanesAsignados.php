@@ -235,72 +235,7 @@ class MigratePlanesAsignados extends BaseCommand
                 }
             });
 
-        // Validación final: Verificar todos los planes migrados
-        $this->info("\n" . str_repeat("=", 60));
-        $this->info("VALIDACIÓN FINAL DE CONSUMIDOS");
-        $this->info(str_repeat("=", 60));
-
-        $total_plans = 0;
-        $valid_plans = 0;
-        $invalid_plans = 0;
-        $invalid_details = [];
-
-        AssignedPlan::
-            whereIn('id', $migrate_plans_id)->
-            chunk(100, function ($assignedPlans) use (&$total_plans, &$valid_plans, &$invalid_plans, &$invalid_details) {
-                foreach ($assignedPlans as $assignedPlan) {
-                    $total_plans++;
-
-                    // Buscar el plan legacy correspondiente
-                    $legacyPlan = Ajuste::where('id', $assignedPlan->id)->first();
-
-                    if ($legacyPlan) {
-                        // Validar consumido (números enteros)
-                        $migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)->sum('price');
-                        $legacy_consumed = (int) $legacyPlan->consumido;
-                        $difference = $migrated_consumed - $legacy_consumed;
-
-                        if ($difference == 0) {
-                            $valid_plans++;
-                        } else {
-                            $invalid_plans++;
-                            $invalid_details[] = [
-                                'id' => $assignedPlan->id,
-                                'legacy' => $legacy_consumed,
-                                'migrated' => $migrated_consumed,
-                                'difference' => $difference
-                            ];
-                        }
-                    }
-                }
-            });
-
-        $this->info("\n" . str_repeat("=", 60));
-        $this->info("RESUMEN DE VALIDACIÓN");
-        $this->info(str_repeat("=", 60));
-        $this->info("Total planes verificados: {$total_plans}");
-        $this->info("Planes válidos: {$valid_plans} (" . round(($valid_plans / max($total_plans, 1)) * 100, 2) . "%)");
-        $this->info("Planes inválidos: {$invalid_plans} (" . round(($invalid_plans / max($total_plans, 1)) * 100, 2) . "%)");
-        $this->info(str_repeat("=", 60));
-
-        if ($invalid_plans > 0) {
-            $this->error("\n¡ATENCIÓN! {$invalid_plans} planes tienen inconsistencias en el consumido.");
-            $this->error("Los primeros 10 planes con errores:");
-
-            foreach (array_slice($invalid_details, 0, 10) as $detail) {
-                $this->error("  Plan {$detail['id']}: Legacy={$detail['legacy']}, Migrado={$detail['migrated']}, Diferencia={$detail['difference']}");
-            }
-
-            if ($invalid_plans > 10) {
-                $this->error("  ... y " . ($invalid_plans - 10) . " más.");
-            }
-        } else {
-            $this->info("\n✓ ¡ÉXITO! Todos los planes tienen consumidos correctos.");
-        }
-
-        $this->info("\n" . str_repeat("=", 60));
-        $this->info("MIGRACIÓN COMPLETADA");
-        $this->info(str_repeat("=", 60));
+    
     }
 
 
