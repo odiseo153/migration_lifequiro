@@ -505,7 +505,7 @@ class MigrationController extends Controller
         }
 
 
-        $migrated_consumed = (int) Voucher::where('assigned_plan_id', $assignedPlan->id)
+        $migrated_consumed = (int) Voucher::on($targetConnection)->where('assigned_plan_id', $assignedPlan->id)
             ->sum('price');
 
         $difference = $legacy_consumed - $migrated_consumed;
@@ -513,7 +513,7 @@ class MigrationController extends Controller
         // Si hay diferencia, crear un voucher con la diferencia para que cuadre
         if ($difference != 0) {
             // Crear un voucher con la diferencia
-            Voucher::create([
+            Voucher::on($targetConnection)->create([
                 'assigned_plan_id' => $assignedPlan->id,
                 'status' => 3,
                 'quantity' => 1,

@@ -64,6 +64,10 @@ class MigrateCompras extends BaseCommand
                             ]);
                         }
 
+                        if (PatientItem::find($p->id)) {
+                            continue;
+                        }
+
                         PatientItem::updateOrCreate(
                             [
                                 'id' => $p->id,

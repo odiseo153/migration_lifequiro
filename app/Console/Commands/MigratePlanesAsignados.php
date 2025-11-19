@@ -24,12 +24,49 @@ class MigratePlanesAsignados extends BaseCommand
 
     public function handle()
     {
-        $this->info("Iniciando migración de planes asignados...");
+        $this->info("Iniciando migración de planes asignados (solo planes más recientes)...");
         $migrate_plans_id = [];
 
+        // Obtener IDs de pacientes que no tienen planes asignados
+        $patient_ids = Patient::whereDoesntHave('assigned_plan')
+            ->whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)
+            ->pluck('id')
+            ->toArray();
+
+        // Obtener IDs de planes válidos (no ignorados)
+
+        // Obtener solo el plan más reciente para cada paciente
+        // Nota: fecha_ciclio_insertada es VARCHAR pero contiene fechas en formato "YYYY-MM-DD HH:MM:SS"
+        // Usamos CAST para convertir a DATETIME y asegurar comparación correcta
+        $latest_dates = Ajuste::selectRaw('paciente_id, MAX(CAST(fecha_ciclio_insertada AS DATETIME)) as max_fecha')
+            ->whereIn('paciente_id', $patient_ids)
+            ->whereNotIn('plan_id', $this->ignored_plan)
+            ->whereNotNull('fecha_ciclio_insertada')
+            ->where('fecha_ciclio_insertada', '!=', '')
+            ->groupBy('paciente_id')
+            ->get()
+            ->keyBy('paciente_id')
+            ->map(fn($item) => $item->max_fecha);
+
+        // Luego obtenemos los IDs de los ajustes que tienen esa fecha más reciente por paciente
+        $latest_plan_ids = [];
+        foreach ($latest_dates as $paciente_id => $max_fecha) {
+            $ajuste_id = Ajuste::where('paciente_id', $paciente_id)
+                ->whereRaw('CAST(fecha_ciclio_insertada AS DATETIME) = ?', [$max_fecha])
+                ->whereNotIn('plan_id', $this->ignored_plan)
+                ->orderBy('id', 'desc') // Si hay múltiples con la misma fecha, tomamos el más reciente por ID
+                ->value('id');
+
+            if ($ajuste_id) {
+                $latest_plan_ids[] = $ajuste_id;
+            }
+        }
+
+        $this->info("Se encontraron " . count($latest_plan_ids) . " planes más recientes para migrar.");
+
         Ajuste::
-            whereIn('paciente_id', Patient::whereDoesntHave('assigned_plan')->whereIn('branch_id', Patient::BRANCHS_TO_MIGRATE)->pluck('id')->toArray())
-            ->whereIn('plan_id', Plan::whereNotIn('id', $this->ignored_plan)->pluck('id')->toArray())
+            whereIn('id', $latest_plan_ids)
+            ->orderBy('fecha_ciclio_insertada', 'desc')
             ->chunk(500, function ($pacientes) use (&$migrate_plans_id) {
                 foreach ($pacientes as $p) {
                     if (in_array($p->estado, [1, 2, 3])) {

@@ -55,6 +55,10 @@ class MigrateHistorialAjuste extends BaseCommand
                         continue;
                     }
 
+                    if (MedicalAjusteModule::find($historial->id)) {
+                        continue;
+                    }
+
                     $item = Item::where('type_of_item_id', ItemType::AJUSTE->value)->first();
 
                     if (!$item) {

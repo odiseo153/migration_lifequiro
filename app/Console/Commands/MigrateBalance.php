@@ -41,6 +41,10 @@ class MigrateBalance extends BaseCommand
                     continue;
                 }
 
+                if (CreditNote::find($p->id)) {
+                    continue;
+                }
+
                 CreditNote::create(
        [
                     'id' => $p->id,

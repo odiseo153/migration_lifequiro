@@ -108,6 +108,10 @@ class MigrateHistorialTerapiaFisicas extends BaseCommand
                         continue;
                     }
 
+                    if (MedicalTerapiaTracionModule::find($historial->id)) {
+                        continue;
+                    }
+
                     $user = User::find($historial->user_id);
 
                     if (!$user) {
