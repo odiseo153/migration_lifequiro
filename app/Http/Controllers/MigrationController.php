@@ -1574,7 +1574,7 @@ class MigrationController extends Controller
             'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
 
-        $batchSize = 100; // Reduce el tamaño del lote para evitar sobrecargar la ejecución
+        $batchSize = 300; // Reduce el tamaño del lote para evitar sobrecargar la ejecución
 
         $totalDeleted = 0;
 
@@ -1582,7 +1582,7 @@ class MigrationController extends Controller
             // NO uses transacciones grandes con operaciones de mucha duración y borrados en lote de datos masivos
 
             // Recorre lote a lote fuera de una transacción global (más seguro para grandes cantidades)
-            AssignedPlan::on($targetConnection)->whereHas('patient', function ($query) use ($request) {
+            AssignedPlan::on($targetConnection)->withTrashed()->whereHas('patient', function ($query) use ($request) {
                 $query->where('branch_id', $request->branch_id);
             })
                 ->limit($request->count)
