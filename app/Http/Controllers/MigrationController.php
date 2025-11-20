@@ -198,7 +198,7 @@ class MigrationController extends Controller
                 $branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
 
                 // OPTIMIZACIÓN: Usar datos pre-cargados para determinar ID final
-                $finalPatientId = $this->determineFinalPatientIdOptimized($p, $existingPatientIds, $existingPatientsByName);
+                $finalPatientId = $this->determineFinalPatientIdOptimized($p, $existingPatientIds, $existingPatientsByName, $targetConnection);
 
                 // Si el ID es null, significa que ya existe un paciente con el mismo nombre
                 if ($finalPatientId === null) {
@@ -304,26 +304,7 @@ class MigrationController extends Controller
                     'count' => count($chunk)
                 ]);
 
-                Patient::on($targetConnection)->upsert($chunk, ['id'], [
-                    'email',
-                    'identity_document',
-                    'first_name',
-                    'last_name',
-                    'birth_date',
-                    'mobile',
-                    'phone',
-                    'token',
-                    'gender',
-                    'civil_status',
-                    'address',
-                    'occupation',
-                    'comment',
-                    'branch_id',
-                    'patient_group_id',
-                    'where_met_us_id',
-                    'updated_at',
-                    'old_id'
-                ]);
+                Patient::on($targetConnection)->insert($chunk);
             }
             $results['migrated_patients'] += count($patientsToInsert);
         }
@@ -1043,7 +1024,7 @@ class MigrationController extends Controller
     /**
      * OPTIMIZADO: Determina el ID final usando datos pre-cargados
      */
-    private function determineFinalPatientIdOptimized($legacyPatient, &$existingPatientIds, $existingPatientsByName)
+    private function determineFinalPatientIdOptimized($legacyPatient, &$existingPatientIds, $existingPatientsByName, string $targetConnection = 'mysql')
     {
         // Garantizar que el ID sea siempre un número
         $originalId = !is_int($legacyPatient->id) ? (int) $legacyPatient->id : $legacyPatient->id;
@@ -1084,13 +1065,9 @@ class MigrationController extends Controller
             // Si llegamos al límite, generar un ID aleatorio numérico muy alto
             do {
                 $newId = rand(99999, 999999);
-            } while (in_array($newId, $existingPatientIds, true) || $newId <= 0);
+            } while (Patient::on($targetConnection)->where('id', $newId)->exists());
+            return $newId;
         }
-
-        // Agregar el nuevo ID numérico al array para futuras verificaciones
-        $existingPatientIds[] = $newId;
-
-        return $newId;
     }
 
     /**
