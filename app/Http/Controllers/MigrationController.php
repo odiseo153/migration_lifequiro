@@ -1071,12 +1071,12 @@ class MigrationController extends Controller
         $idExtra = 1; // Empezar desde 1
         $maxAttempts = 100;
         $attempts = 0;
-        $newId = (int) ($originalId + $idExtra + random_int(9999, 1000)); // Sumar múltiplos grandes para evitar colisiones triviales
+        $newId = (int) ($originalId + $idExtra + random_int(999, 1000)); // Sumar múltiplos grandes para evitar colisiones triviales
 
         // Buscar un nuevo ID numérico disponible
         while ((in_array($newId, $existingPatientIds, true) || $newId <= 0) && $attempts < $maxAttempts) {
             $idExtra++;
-            $newId = (int) ($originalId + $idExtra + random_int(9999, 1000)); // Sumar múltiplos de 10M para asegurar ID largo y numérico
+            $newId = (int) ($originalId + $idExtra + random_int(999, 1000)); // Sumar múltiplos de 10M para asegurar ID largo y numérico
             $attempts++;
         }
 
