@@ -176,12 +176,21 @@ class MigrationController extends Controller
         // OPTIMIZACIÓN: Pre-cargar TODOS los pacientes existentes para evitar sobrescribir IDs
         // CRÍTICO: Debemos obtener TODOS los IDs existentes, no solo los de $patientIds
         $existingPatientIds = Patient::on($targetConnection)->pluck('id')->toArray();
-        $existingPatientsByName = Patient::on($targetConnection)->select('id', 'first_name', 'last_name')
+        $existingPatientsByName = Patient::on($targetConnection)
+            ->select('id', 'first_name', 'last_name')
             ->get()
             ->mapWithKeys(function ($patient) {
                 $fullName = strtolower(trim($patient->first_name . ' ' . $patient->last_name));
                 return [$fullName => $patient->id];
             });
+
+        // Log de información sobre pacientes existentes en la DB target
+        Log::info("Pacientes existentes en DB target cargados", [
+            'target_connection' => $targetConnection,
+            'total_existing_ids' => count($existingPatientIds),
+            'total_existing_names' => count($existingPatientsByName),
+            'sample_names' => array_slice(array_keys($existingPatientsByName->toArray()), 0, 5)
+        ]);
 
         // OPTIMIZACIÓN: Pre-procesar referencias para evitar similar_text en bucle
         $whereHeMetUsMap = $this->buildReferenceMap($whereHeMetUsOptions);
@@ -198,13 +207,29 @@ class MigrationController extends Controller
                 $branch_id = $p->centro_id == 0 || $p->centro_id == null ? 1 : $p->centro_id;
 
                 // OPTIMIZACIÓN: Usar datos pre-cargados para determinar ID final
-                $finalPatientId = $this->determineFinalPatientIdOptimized($p, $existingPatientIds, $existingPatientsByName, $targetConnection);
+                $patientIdResult = $this->determineFinalPatientIdOptimized($p, $existingPatientIds, $existingPatientsByName, $targetConnection);
 
-                // Si el ID es null, significa que ya existe un paciente con el mismo nombre
-                if ($finalPatientId === null) {
-                    $results['errors'][] = "Paciente {$p->id} ({$p->nombre} {$p->apellido}) ya existe en la base de datos con el mismo nombre";
+                // Verificar si es un paciente duplicado
+                if ($patientIdResult['status'] === 'duplicate') {
+                    $existingId = $patientIdResult['existing_id'];
+                    $results['errors'][] = "Paciente {$p->id} ({$p->nombre} {$p->apellido}) ya existe en la base de datos con el mismo nombre. ID existente en DB target: {$existingId}";
+                    Log::warning("Paciente duplicado detectado", [
+                        'legacy_id' => $p->id,
+                        'existing_id' => $existingId,
+                        'patient_name' => "{$p->nombre} {$p->apellido}",
+                        'target_connection' => $targetConnection
+                    ]);
                     continue;
                 }
+
+                // Verificar si el ID es inválido
+                if ($patientIdResult['status'] === 'invalid_id') {
+                    $results['errors'][] = "Paciente {$p->id} ({$p->nombre} {$p->apellido}) tiene un ID inválido";
+                    continue;
+                }
+
+                // Extraer el ID final del resultado
+                $finalPatientId = $patientIdResult['id'];
 
                 // Log para debug: Mostrar mapeo de IDs
                 if ($finalPatientId != $p->id) {
@@ -224,12 +249,16 @@ class MigrationController extends Controller
                     $referencia = strtolower(trim($p->referencia));
                     $where_met_us_id = $whereHeMetUsMap[$referencia] ?? null;
                 }
-
+                $cedula_no = $p->cedula_no == '' ? null : $p->cedula_no;
+                $document_exists = Patient::on($targetConnection)->where('identity_document', $cedula_no)->exists();
+                if ($document_exists) {
+                    $cedula_no = null;
+                }
                 // Preparar datos del paciente
                 $patientData = [
                     'id' => $finalPatientId,
                     'email' => $p->correo,
-                    'identity_document' => $p->cedula_no == '' ? null : $p->cedula_no,
+                    'identity_document' => $cedula_no,
                     'first_name' => $p->nombre ?? 'sin nombre',
                     'last_name' => $p->apellido ?? 'sin apellido',
                     'birth_date' => $this->parseDate($p->fecha_nacimiento),
@@ -440,7 +469,7 @@ class MigrationController extends Controller
         // Calcular precio por ítem
         $total_items = $assignedPlan->plan->total_sessions + $assignedPlan->therapies_number;
         $item_price = $total_items != 0 ? $assignedPlan->amount / $total_items : 0;
-        $legacy_consumed = $p->consumido ;
+        $legacy_consumed = $p->consumido;
 
         // Crear vouchers en base de datos objetivo
         if ($legacy_consumed > 0) {
@@ -1031,21 +1060,39 @@ class MigrationController extends Controller
 
         // Rechazar si $originalId no es válido numéricamente
         if ($originalId <= 0) {
-            return null;
+            return ['status' => 'invalid_id', 'existing_id' => null];
         }
 
         $legacyFullName = strtolower(trim(($legacyPatient->nombre ?? '') . ' ' . ($legacyPatient->apellido ?? '')));
 
-        // Verificar si ya existe un paciente con el mismo nombre completo
+        // Verificar si ya existe un paciente con el mismo nombre completo en la DB target
         if (isset($existingPatientsByName[$legacyFullName])) {
-            return null; // Ya existe un paciente con el mismo nombre
+            $existingPatientId = $existingPatientsByName[$legacyFullName];
+
+            // Verificación adicional: confirmar que el paciente realmente existe en la DB
+            $patientExists = Patient::on($targetConnection)
+                ->where('id', $existingPatientId)
+                ->exists();
+
+            if ($patientExists) {
+                // Retornar información del paciente duplicado
+                return ['status' => 'duplicate', 'existing_id' => $existingPatientId];
+            } else {
+                // Si no existe, remover del mapa (no debería suceder, pero es una salvaguarda)
+                Log::warning("Paciente en mapa pero no en DB", [
+                    'full_name' => $legacyFullName,
+                    'supposed_id' => $existingPatientId,
+                    'target_connection' => $targetConnection
+                ]);
+                unset($existingPatientsByName[$legacyFullName]);
+            }
         }
 
         // Verificar si el ID original existe
         if (!in_array($originalId, $existingPatientIds, true)) {
             // Agregar el ID al array para futuras verificaciones
             $existingPatientIds[] = $originalId;
-            return $originalId; // El ID no existe, usar el original
+            return ['status' => 'new', 'id' => $originalId]; // El ID no existe, usar el original
         }
 
         // El ID existe, generar nuevo ID con incremento numérico, nunca como string
@@ -1066,8 +1113,14 @@ class MigrationController extends Controller
             do {
                 $newId = rand(99999, 999999);
             } while (Patient::on($targetConnection)->where('id', $newId)->exists());
-            return $newId;
+
+            $existingPatientIds[] = $newId;
+            return ['status' => 'new', 'id' => $newId];
         }
+
+        // Si todo salió bien, retornar el nuevo ID
+        $existingPatientIds[] = $newId;
+        return ['status' => 'new', 'id' => $newId];
     }
 
     /**
