@@ -1046,7 +1046,7 @@ class MigrationController extends Controller
     private function determineFinalPatientIdOptimized($legacyPatient, &$existingPatientIds, $existingPatientsByName)
     {
         // Garantizar que el ID sea siempre un número
-        $originalId = is_numeric($legacyPatient->id) ? (int) $legacyPatient->id : 0;
+        $originalId = !is_int($legacyPatient->id) ? (int) $legacyPatient->id : $legacyPatient->id;
 
         // Rechazar si $originalId no es válido numéricamente
         if ($originalId <= 0) {
@@ -1083,7 +1083,7 @@ class MigrationController extends Controller
         if ($attempts >= $maxAttempts) {
             // Si llegamos al límite, generar un ID aleatorio numérico muy alto
             do {
-                $newId = rand(900000000, 999999999);
+                $newId = rand(99999, 999999);
             } while (in_array($newId, $existingPatientIds, true) || $newId <= 0);
         }
 
