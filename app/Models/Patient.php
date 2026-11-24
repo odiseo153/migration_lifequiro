@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
-use App\Enums\ServicesStatus;
+use App\Enums\AppointmentStatus;
 use App\Enums\AppointmentType;
+use App\Enums\ServicesStatus;
 use App\Models\PlanTransaction;
+use Carbon\Carbon;
 
 class Patient extends AuthenticablePatient
 {
@@ -34,9 +35,10 @@ class Patient extends AuthenticablePatient
         'patient_group_id'
     ];
 
-    protected $appends = ['is_birthday','age','patient_code','type_patient','where_he_met_us_name','last_appointment'];
-   // protected $with = ['assigned_plan'];
-   const BRANCHS_TO_MIGRATE=[4];
+    protected $appends = ['is_birthday', 'age', 'patient_code', 'type_patient', 'where_he_met_us_name', 'last_appointment'];
+
+    // protected $with = ['assigned_plan'];
+    const BRANCHS_TO_MIGRATE = [4];
 
     public function waiting_rooms()
     {
@@ -85,12 +87,13 @@ class Patient extends AuthenticablePatient
 
     public function card_items()
     {
-        return $this->belongsToMany(Item::class, 'patient_items', 'patient_id', 'item_id')
-                    ->withPivot( 'invoice_id','paid__with_card','individual_cost','quantity', 'discount', 'total','type','id','deleted_at','no_document')
-                    ->orderBy('patient_items.id','desc')
-                    //->where('patient_items.quantity','>','0')
-                    ->whereNull('patient_items.deleted_at')
-                    ->withTimestamps();
+        return $this
+            ->belongsToMany(Item::class, 'patient_items', 'patient_id', 'item_id')
+            ->withPivot('invoice_id', 'paid__with_card', 'individual_cost', 'quantity', 'discount', 'total', 'type', 'id', 'deleted_at', 'no_document')
+            ->orderBy('patient_items.id', 'desc')
+            // ->where('patient_items.quantity','>','0')
+            ->whereNull('patient_items.deleted_at')
+            ->withTimestamps();
     }
 
     public function acquired_services()
@@ -105,12 +108,13 @@ class Patient extends AuthenticablePatient
 
     public function ars()
     {
-        return $this->belongsToMany(Ars::class,'insurances');
+        return $this->belongsToMany(Ars::class, 'insurances');
     }
 
     public function itemsUnlocked()
     {
-        return $this->belongsToMany(PatientItem::class, 'acquired_services')
+        return $this
+            ->belongsToMany(PatientItem::class, 'acquired_services')
             ->whereNull('acquired_services.deleted_at')
             ->withTimestamps();
     }
@@ -167,7 +171,7 @@ class Patient extends AuthenticablePatient
 
     public function branch()
     {
-        return $this->belongsTo(Branch::class,'branch_id');
+        return $this->belongsTo(Branch::class, 'branch_id');
     }
 
     public function plan_transactions()
@@ -177,43 +181,42 @@ class Patient extends AuthenticablePatient
 
     public function where_he_met_us()
     {
-        return $this->belongsTo(WhereHeMetUs::class,'where_met_us_id');
+        return $this->belongsTo(WhereHeMetUs::class, 'where_met_us_id');
     }
 
     public function medical_data()
     {
-        return $this->hasOne( PatientMedicalData::class);
+        return $this->hasOne(PatientMedicalData::class);
     }
 
     public function assigned_plan()
     {
-        return $this->hasOne( AssignedPlan::class);
+        return $this->hasOne(AssignedPlan::class);
     }
 
     public function physical_examination()
     {
-        return $this->hasOne( PhysicalExamination::class);
+        return $this->hasOne(PhysicalExamination::class);
     }
 
     public function spine_evaluation()
     {
-        return $this->hasOne( SpineEvaluation::class);
+        return $this->hasOne(SpineEvaluation::class);
     }
 
     public function diagnosis_and_treatment()
     {
-        return $this->hasOne( DiagnosisAndTreatment::class);
+        return $this->hasOne(DiagnosisAndTreatment::class);
     }
 
     public function patient_progress_after_treatment()
     {
-        return $this->hasOne( PatientProgressAfterTreatment::class);
+        return $this->hasOne(PatientProgressAfterTreatment::class);
     }
-
 
     public function history_medical()
     {
-        return $this->hasOne( HistoryMedical::class);
+        return $this->hasOne(HistoryMedical::class);
     }
 
     public function patient_group()
@@ -280,6 +283,7 @@ class Patient extends AuthenticablePatient
     {
         return $this->hasMany(ProgrammingHistory::class);
     }
+
     public function binnacles()
     {
         return $this->hasMany(Binnacle::class);
@@ -295,7 +299,7 @@ class Patient extends AuthenticablePatient
         $today = Carbon::today();
 
         return $birthDate->month === $today->month &&
-               $birthDate->day === $today->day;
+            $birthDate->day === $today->day;
     }
 
     public function getAgeAttribute(): int
@@ -309,14 +313,14 @@ class Patient extends AuthenticablePatient
 
         $years = $birthDate->diffInYears($today);
 
-        return (int)$years;
+        return (int) $years;
     }
 
     public function getLastAppointmentAttribute()
     {
         $last_appointment = $this->appointments()->orderBy('created_at', 'desc')->first();
 
-        if(!$last_appointment){
+        if (!$last_appointment) {
             return [];
         }
 
@@ -336,20 +340,17 @@ class Patient extends AuthenticablePatient
 
     public function getHasAFullCycle()
     {
-        return $this->appointments()
-        ->whereIn('type_of_appointment_id', [
-            AppointmentType::CONSULTA->value,
-            AppointmentType::RADIOGRAFIA->value,
-            AppointmentType::REPORTE->value,
-        ])
-        ->count() >= 3;
+        return $this
+            ->appointments()
+            ->where('type_of_appointment_id', '>=', AppointmentType::REPORTE->value)
+            ->whereIn('status_id', [AppointmentStatus::COMPLETADA->value, AppointmentStatus::NO_RADIOGRAFIA->value])
+            ->exists();
     }
 
     public function getTypePatient()
     {
-
         if ($this->assigned_plan) {
-            return ($this->assigned_plan->plan->type_of_plan->name == 'VIP' ? 'MR VIP' : 'MR');
+            return 'MR';
         }
 
         if ($this->getHasAFullCycle()) {
@@ -366,7 +367,7 @@ class Patient extends AuthenticablePatient
                 $q->whereHas('assigned_plan.plan.type_of_plan', function ($sub) use ($type) {
                     if ($type === 'MR VIP') {
                         $sub->where('name', 'VIP');
-                    } else { // MR
+                    } else {  // MR
                         $sub->where('name', '!=', 'VIP');
                     }
                 });
@@ -375,7 +376,8 @@ class Patient extends AuthenticablePatient
             // Caso MIP (full cycle)
             if ($type === 'MIP') {
                 $q->whereExists(function ($sub) {
-                    $sub->selectRaw('1')
+                    $sub
+                        ->selectRaw('1')
                         ->from('appointments')
                         ->whereColumn('appointments.patient_id', 'patients.id')
                         ->whereIn('type_of_appointment_id', [
@@ -393,16 +395,17 @@ class Patient extends AuthenticablePatient
     public function NextPlanItem()
     {
         // Obtener todos los servicios consumidos ordenados por fecha (solo items de plan)
-        $acquiredServiceItems = $this->acquired_services()
+        $acquiredServiceItems = $this
+            ->acquired_services()
             ->whereNotNull('plan_item_id')
             ->whereNotNull('assigned_plan_id')
             ->where('status', ServicesStatus::COMPLETADA->value)
             ->with(['item', 'patient_plan_item'])
             ->orderBy('created_at', 'asc')
             ->get()
-            ->filter(fn($service) => $service->plan_item_id && in_array(optional($service->patient_plan_item)->type_of_item_id, [5, 7])); // Solo ajustes y terapia física de plan
+            ->filter(fn($service) => $service->plan_item_id && in_array(optional($service->patient_plan_item)->type_of_item_id, [5, 7]));  // Solo ajustes y terapia física de plan
 
-        if($this->assigned_plan){
+        if ($this->assigned_plan) {
             $acquiredServiceItems = $acquiredServiceItems->where('assigned_plan_id', $this->assigned_plan->id);
         }
 
@@ -423,7 +426,7 @@ class Patient extends AuthenticablePatient
 
         // Determinar el siguiente item basado en el patrón: 2 ajustes, 1 terapia, 2 ajustes, 1 terapia...
         $totalServices = count($serviceHistory);
-        $expectedTypeId = 7; // Por defecto Ajuste
+        $expectedTypeId = 7;  // Por defecto Ajuste
         $expectedTypeName = 'Ajuste';
 
         if ($totalServices === 0) {
@@ -435,12 +438,12 @@ class Patient extends AuthenticablePatient
             $positionInCycle = $totalServices % 3;
 
             switch ($positionInCycle) {
-                case 0: // Posición 0: primer ajuste del ciclo
-                case 1: // Posición 1: segundo ajuste del ciclo
+                case 0:  // Posición 0: primer ajuste del ciclo
+                case 1:  // Posición 1: segundo ajuste del ciclo
                     $expectedTypeId = 7;
                     $expectedTypeName = 'Ajuste';
                     break;
-                case 2: // Posición 2: terapia física
+                case 2:  // Posición 2: terapia física
                     $expectedTypeId = 5;
                     $expectedTypeName = 'Terapia Física';
                     break;
@@ -448,9 +451,9 @@ class Patient extends AuthenticablePatient
         }
 
         return [
-            'name' => $expectedTypeName,           // Nombre del próximo item
+            'name' => $expectedTypeName,  // Nombre del próximo item
             'type_of_item_id' => $expectedTypeId,  // ID del tipo de item
-            'next_sequence' => $this->getNextSequenceInfo($totalServices) // Info de secuencia
+            'next_sequence' => $this->getNextSequenceInfo($totalServices)  // Info de secuencia
         ];
     }
 
@@ -479,9 +482,3 @@ class Patient extends AuthenticablePatient
         return $this->where_he_met_us() ? $this->where_he_met_us()->value('name') : null;
     }
 }
-
-
-
-
-
-

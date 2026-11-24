@@ -1548,35 +1548,24 @@ class MigrationController extends Controller
 
         $request->validate([
             'patient_id' => 'required|integer|exists:' . $targetConnection . '.patients,id',
-            'type' => 'required|integer|exists:' . $targetConnection . '.type_of_appointments,id|in:1,2,3,4',
             'target_database' => 'nullable|string|in:mysql,produccion'
         ]);
 
-        $patient = Patient::on($targetConnection)->find($request->patient_id);
+        $patient = Patient::on($targetConnection)->findOrFail($request->patient_id);
 
-        $TypeAppointment = $request->type != 1 ? $request->type - 1 : AppointmentType::CONSULTA->value;
 
-        /*
-        // Buscar la última cita completada del paciente de ese tipo en la base de datos target
-        $lastAppointment = Appointment::on($targetConnection)
-        ->where('patient_id', $patient->id)
-            ->where('status_id', AppointmentStatus::COMPLETADA->value)
-            ->orderByDesc('created_at')
-            ->first();
-
-            if ($lastAppointment) {
+        if($patient->type_patient){
             return response()->json([
                 'success' => false,
-                'message' => 'La ultima cita del paciente es de este tipo'
+                'message' => 'El paciente ya es '. $patient->type_patient
             ], 400);
         }
 
-        */
         Appointment::on($targetConnection)->create([
-            'note' => 'Cita de migración agregada manualmente',
+            'note' => 'Cita de migracion agregada manualmente desde api migracion',
             'patient_id' => $patient->id,
             'branch_id' => $patient->branch_id,
-            'type_of_appointment_id' => $TypeAppointment,
+            'type_of_appointment_id' => AppointmentType::REPORTE->value,
             'status_id' => AppointmentStatus::COMPLETADA->value,
             'date' => now()->format('Y-m-d'),
             'hour' => now()->format('H:i:s'),
@@ -1585,7 +1574,7 @@ class MigrationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Tipo de paciente cambiado exitosamente, ahora es de tipo ' . TypeOfAppointments::on($targetConnection)->find($TypeAppointment + 1)->name
+            'message' => 'El paciente '. $patient->first_name . ' ' . $patient->last_name . ' es tipo MIP'
         ], 200);
 
     }
